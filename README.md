@@ -1,5 +1,7 @@
 # RedLink 🩸
 
+[![CI](https://github.com/kbpkavisika/RedLink/actions/workflows/ci.yml/badge.svg)](https://github.com/kbpkavisika/RedLink/actions/workflows/ci.yml)
+
 A blood donor matching and request management system that connects hospitals with suitable blood donors.
 
 RedLink lets a hospital post a request and instantly get a ranked list of compatible, available donors nearby, turning a manual search into a database query.
@@ -20,6 +22,7 @@ RedLink lets a hospital post a request and instantly get a ranked list of compat
 - [Getting Started](#getting-started)
 - [Testing the API](#testing-the-api)
 - [Scripts](#scripts)
+- [Development Workflow](#development-workflow)
 - [Roadmap](#roadmap)
 
 ---
@@ -132,7 +135,7 @@ Matches are **ranked** by:
 | Auth | Spring Security + JWT *(planned)* | Stateless, suits a separate frontend, scales without shared session storage |
 | Database | PostgreSQL | Relational data with real constraints and transactions |
 | API style | REST + JSON | Simple, testable in Postman, universal |
-| CI/CD | GitHub Actions *(planned)* | Tests gate every deploy |
+| CI/CD | GitHub Actions (CI live, CD planned) | Tests gate every merge and deploy |
 | Hosting | Vercel (frontend), Render (API), Neon (PostgreSQL) *(planned)* | Free tiers suitable for a portfolio project |
 
 Frontend libraries: React Router, Axios, TanStack Query, React Hook Form + Zod, Tailwind CSS, Recharts, React Hot Toast.
@@ -317,6 +320,8 @@ erDiagram
 
 ```
 RedLink/
+├── .github/workflows/ci.yml         # CI pipeline (GitHub Actions)
+│
 ├── frontend/                        # React + TypeScript (Vite)
 │   ├── src/
 │   │   ├── api/client.ts            # Axios instance (baseURL: /api)
@@ -352,7 +357,7 @@ RedLink/
 |---|---|---|
 | [Node.js](https://nodejs.org/) | 20 or later | `node -v` |
 | [JDK](https://www.oracle.com/java/technologies/downloads/) | 25 or later | `java -version` |
-| [PostgreSQL](https://www.postgresql.org/download/) | 16 or later (includes pgAdmin) | pgAdmin opens and connects |
+| [PostgreSQL](https://www.postgresql.org/download/) | 18 (includes pgAdmin) | pgAdmin opens and connects |
 | [Git](https://git-scm.com/) | any | `git --version` |
 
 Maven does **not** need to be installed. The backend includes the Maven wrapper (`mvnw`).
@@ -360,7 +365,7 @@ Maven does **not** need to be installed. The backend includes the Maven wrapper 
 ### 1. Clone the repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/kbpkavisika/RedLink.git
 cd RedLink
 ```
 
@@ -566,6 +571,58 @@ On Windows, use `.\mvnw.cmd` instead of `./mvnw`.
 
 ---
 
+## Development Workflow
+
+`main` is protected: changes can't be pushed to it directly. Every change goes through a pull request, and both CI checks must pass before it can be merged.
+
+```
+feature branch ──► pull request ──► CI runs ──┬── ❌ fails  → fix and push again (CI re-runs)
+                                              └── ✅ passes → merge into main
+```
+
+### Steps
+
+```bash
+git checkout main
+git pull
+git checkout -b feature/your-change    # new branch for each task
+
+# ...make changes...
+
+git add .
+git commit -m "feat: describe your change"
+git push -u origin feature/your-change
+```
+
+Then open a pull request into `main` on GitHub and merge it once both checks are green.
+
+### Branch names
+
+| Prefix | Use for |
+|---|---|
+| `feature/` | New functionality |
+| `fix/` | Bug fixes |
+| `docs/` | README and documentation |
+| `ci/` | Workflow and pipeline changes |
+
+### What CI checks
+
+The workflow in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every pull request and every push to `main`:
+
+| Job | Steps |
+|---|---|
+| **Backend (build + test)** | Starts a temporary PostgreSQL 18 database, sets up Java 25, runs `./mvnw verify` (compile + tests) |
+| **Frontend (lint + build)** | Sets up Node.js 24, runs `npm ci`, `npm run lint` and `npm run build` |
+
+Run the same checks locally before pushing:
+
+```bash
+cd frontend && npm run lint && npm run build
+cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
+```
+
+---
+
 ## Roadmap
 
 - [x] Project setup: React + TypeScript frontend, Spring Boot backend, PostgreSQL
@@ -579,5 +636,7 @@ On Windows, use `.\mvnw.cmd` instead of `./mvnw`.
 - [ ] Notifications
 - [ ] Role-based dashboards in the frontend
 - [ ] Flyway database migrations
-- [ ] GitHub Actions CI
+- [x] GitHub Actions CI (backend tests + frontend lint/build on every pull request)
+- [x] Branch protection on `main` (pull request + passing CI required)
+- [ ] Dockerize the backend
 - [ ] Deployment (Vercel, Render, Neon)
