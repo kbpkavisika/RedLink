@@ -45,7 +45,9 @@ jobs:
           cache: maven
 
       - name: Build and test
-        run: ./mvnw -B verify
+        run: |
+          chmod +x mvnw
+          ./mvnw -B verify
 
   frontend:
     name: Frontend (lint + build)
