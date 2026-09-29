@@ -166,7 +166,16 @@ The kit is **flat by default**: panels use a 1px `--color-border` and no shadow.
 - Sizes are 16 (inline/meta), 18 (buttons, inputs), 22 (nav, logo), 30/36 (state tiles).
 - Decorative icons get `aria-hidden="true"`.
 - **Lucide** matches this style closely. Set `strokeWidth={1.75}` globally.
-- The brand mark is a filled blood drop (`M12 2.5c-3.5 4.6-6.5 8.4-6.5 12a6.5 6.5 0 0 0 13 0c0-3.6-3-7.4-6.5-12z`) in white on a 40×40 `primary` tile with an 11px radius, next to the wordmark.
+- The brand mark is a blood drop with a heartbeat line. Use the files in `frontend/public/brand/` rather than redrawing it:
+
+  | File | Use |
+  |---|---|
+  | `redlink-logo.svg` | Full logo (mark + wordmark) on light backgrounds |
+  | `redlink-logo-reversed.svg` | Full logo on `ink` or other dark backgrounds |
+  | `redlink-icon.svg` | Mark alone, red on light backgrounds |
+  | `redlink-icon-white.svg` | Mark alone, white on `primary` or dark backgrounds |
+  | `redlink-app-icon.svg` | Rounded-square app icon (touch icon, PWA, social) |
+  | `../favicon.svg` | Browser tab icon; heavier heartbeat stroke so it reads at 16–32px |
 
 ### 2.8 Motion
 
