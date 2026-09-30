@@ -5,11 +5,14 @@ import { Toaster } from 'react-hot-toast'
 import './index.css'
 import App from './App.tsx'
 import { queryClient } from './lib/queryClient'
+import { AuthProvider } from './auth/AuthProvider'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
       {/* Short confirmations after actions; page-level errors use StateView instead */}
       <Toaster
         position="top-right"
