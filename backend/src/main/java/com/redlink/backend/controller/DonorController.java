@@ -1,10 +1,11 @@
 package com.redlink.backend.controller;
 
-import com.redlink.backend.model.Donor;
+import com.redlink.backend.dto.DonorSummary;
 import com.redlink.backend.repository.DonorRepository;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
+// Donors are created through registration (POST /api/auth/register/donor, planned)
 @RestController
 @RequestMapping("/api/donors")
 public class DonorController {
@@ -16,12 +17,9 @@ public class DonorController {
     }
 
     @GetMapping
-    public List<Donor> getAll() {
-        return donorRepository.findAll();
-    }
-
-    @PostMapping
-    public Donor create(@RequestBody Donor donor) {
-        return donorRepository.save(donor);
+    public List<DonorSummary> getAll() {
+        return donorRepository.findAllWithUser().stream()
+                .map(DonorSummary::from)
+                .toList();
     }
 }
