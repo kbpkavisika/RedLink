@@ -16,6 +16,11 @@ export function LoginPage() {
           <Link to="/forgot-password" className="self-start text-label font-semibold no-underline">
             Forgot password?
           </Link>
+          {import.meta.env.DEV && (
+            <p className="rounded-lg border border-dashed border-border-strong px-4 py-3 text-label text-text-muted">
+              Development: <Link to="/dev/components">sign in as a test user</Link> in the component gallery.
+            </p>
+          )}
         </div>
       </Panel>
     </PublicLayout>

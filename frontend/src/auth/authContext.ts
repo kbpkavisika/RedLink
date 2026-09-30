@@ -14,6 +14,8 @@ export interface AuthContextValue {
   logout: () => void;
   // Reload the user after something about them changed, e.g. after changing the password
   refreshUser: () => Promise<void>;
+  // Development only (undefined in production builds): act as a test user without the backend
+  devSignIn?: (user: CurrentUser) => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

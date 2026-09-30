@@ -6,6 +6,29 @@ import { tokenStore } from '../lib/tokenStore';
 import type { CurrentUser } from '../types';
 import { AuthContext, type AuthContextValue, type AuthStatus } from './authContext';
 
+// Dev sign-in survives a page reload for the tab's lifetime. import.meta.env.DEV is false in
+// production builds, so this code is removed there.
+const DEV_USER_KEY = 'redlink.devUser';
+
+function readDevUser(): CurrentUser | null {
+  if (!import.meta.env.DEV) return null;
+  try {
+    const raw = sessionStorage.getItem(DEV_USER_KEY);
+    return raw ? (JSON.parse(raw) as CurrentUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearDevUser() {
+  if (!import.meta.env.DEV) return;
+  try {
+    sessionStorage.removeItem(DEV_USER_KEY);
+  } catch {
+    // storage unavailable: nothing to clear
+  }
+}
+
 /**
  * Knows who is signed in.
  *
@@ -18,10 +41,13 @@ import { AuthContext, type AuthContextValue, type AuthStatus } from './authConte
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const [user, setUser] = useState<CurrentUser | null>(null);
-  const [status, setStatus] = useState<AuthStatus>(() => (tokenStore.get() ? 'loading' : 'anonymous'));
+  const [user, setUser] = useState<CurrentUser | null>(readDevUser);
+  const [status, setStatus] = useState<AuthStatus>(() =>
+    readDevUser() ? 'authenticated' : tokenStore.get() ? 'loading' : 'anonymous',
+  );
 
   const signOutLocally = useCallback(() => {
+    clearDevUser();
     setUser(null);
     setStatus('anonymous');
     queryClient.clear(); // don't show the previous user's cached data to the next one
@@ -69,9 +95,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(await authApi.fetchCurrentUser());
   }, []);
 
+  const devSignIn = useCallback(
+    (devUser: CurrentUser) => {
+      if (!import.meta.env.DEV) return;
+      tokenStore.clear();
+      queryClient.clear();
+      try {
+        sessionStorage.setItem(DEV_USER_KEY, JSON.stringify(devUser));
+      } catch {
+        // storage unavailable: the dev user lasts until the page reloads
+      }
+      setUser(devUser);
+      setStatus('authenticated');
+    },
+    [queryClient],
+  );
+
   const value = useMemo<AuthContextValue>(
-    () => ({ user, status, login, logout, refreshUser }),
-    [user, status, login, logout, refreshUser],
+    () => ({
+      user,
+      status,
+      login,
+      logout,
+      refreshUser,
+      devSignIn: import.meta.env.DEV ? devSignIn : undefined,
+    }),
+    [user, status, login, logout, refreshUser, devSignIn],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

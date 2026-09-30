@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { RedirectIfAuthenticated } from './auth/RedirectIfAuthenticated';
 import { RequireAuth } from './auth/RequireAuth';
@@ -10,6 +11,9 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { NewRequestPage } from './pages/hospital/NewRequestPage';
+
+// Development only: in a production build this is null, so the gallery isn't bundled at all
+const ComponentGallery = import.meta.env.DEV ? lazy(() => import('./dev/ComponentGallery')) : null;
 
 /*
  * Route map. Placeholders (ComingSoonPage) are replaced by real pages in the feature branches.
@@ -107,6 +111,17 @@ export default function App() {
             </Route>
           </Route>
         </Route>
+
+        {ComponentGallery && (
+          <Route
+            path="/dev/components"
+            element={
+              <Suspense fallback={null}>
+                <ComponentGallery />
+              </Suspense>
+            }
+          />
+        )}
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
