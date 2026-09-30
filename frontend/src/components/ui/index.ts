@@ -4,6 +4,7 @@ export { BloodGroupBadge } from './BloodGroupBadge';
 export { Button } from './Button';
 export { Chip } from './Chip';
 export { Input } from './Input';
+export { LinkButton } from './LinkButton';
 export { Panel } from './Panel';
 export { Skeleton, SkeletonRows } from './Skeleton';
 export { StateView, type ScreenState } from './StateView';
