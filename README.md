@@ -6,7 +6,7 @@ A blood donor matching and request management system that connects hospitals wit
 
 RedLink lets a hospital post a request and instantly get a ranked list of compatible, available donors nearby, turning a manual search into a database query.
 
-> **Status: early development.** The project skeleton is in place: React frontend, Spring Boot API and PostgreSQL. The full database schema is created by Flyway, and the donor list endpoint works end to end. Everything else below describes the target design. See [Roadmap](#roadmap) for what is built and what is planned.
+> **Status: early development.** The project skeleton is in place: React frontend, Spring Boot API and PostgreSQL. The full database schema is created by Flyway, the API has its service layer and error handling, and the donor read endpoints work end to end. Everything else below describes the target design. See [Roadmap](#roadmap) for what is built and what is planned.
 
 ---
 
@@ -224,12 +224,57 @@ RedLink is a **layered monolith**: one Spring Boot application split into Contro
 └──────────────────┘               └──────────────── localhost:8080 ───────────────────────────────┘
 ```
 
-| Layer | Responsibility |
+| Layer | Responsibility | Never does |
+|---|---|---|
+| **Controller** | HTTP only: validates the request DTO with `@Valid`, calls **one** service method, returns the result | Business rules or repository calls |
+| **Service** | Business rules, transactions (`@Transactional`, read-only by default), entity ↔ DTO mapping; throws `ApiException`s | Anything HTTP (`ResponseEntity`, status codes) |
+| **Repository** | Spring Data JPA queries | Business logic |
+| **DTO** | Java `record`s for what goes in and out of the API, so entities are never exposed | Behaviour |
+| **Exception handler** | `GlobalExceptionHandler` turns every error into the one [error format](#error-format) | Business logic |
+
+`DonorController` → `DonorService` → `DonorRepository` is the reference example to copy for new features.
+
+**Rules that keep the layers honest**
+
+- Request DTOs contain only the fields a client may set. A registration DTO has no `role` field, so nobody can make themselves an admin.
+- Field rules (not blank, positive, email format) are annotations on the request DTO. Rules that need data ("email already registered", "hospital not approved") live in the service.
+- `spring.jpa.open-in-view=false`: the database connection closes when the service method ends, so lazy-loading an entity outside a service fails loudly. Load what you need in the service (e.g. `join fetch`) and return a DTO.
+
+### Error format
+
+Every error, from any endpoint, has the same JSON shape:
+
+```json
+{
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Some fields are invalid.",
+  "fieldErrors": [
+    { "field": "unitsNeeded", "message": "must be greater than 0" }
+  ],
+  "ref": "7f3a-19c2",
+  "timestamp": "2026-09-30T10:15:00Z",
+  "path": "/api/requests"
+}
+```
+
+| Field | Use in the frontend |
 |---|---|
-| **Controller** | HTTP only: validates input, calls one service method, returns a status code |
-| **Service** | Owns business rules, transactions and the matching engine |
-| **Repository** | Spring Data JPA interfaces; no business logic |
-| **DTO** | Request and response objects, so entities are never exposed directly |
+| `message` | Plain sentence shown to the user |
+| `fieldErrors` | Message under each invalid form field (empty when not a form error) |
+| `ref` | Shown as `Error 500 · ref 7f3a-19c2`. The same ref is in the server log, so a reported ref leads to the exact error |
+| `status` | Decides the screen state: 403 → Blocked, 409 → inline message, 5xx → Error with "Try again" |
+
+Services signal expected problems by throwing one of these; the handler picks the status:
+
+| Exception | Status | Example |
+|---|---|---|
+| `NotFoundException` | 404 | "Donor 99 was not found." |
+| `ConflictException` | 409 | "You've already responded to this request." |
+| `ForbiddenException` | 403 | "Posting unlocks after an admin approves your hospital." |
+| `BadRequestException` | 400 | "Rejecting a hospital requires a reason." |
+
+The handler also covers invalid fields (400), broken JSON or an unknown value such as `"bloodGroup": "C+"` (400), a non-numeric ID (400), unknown URLs (404), wrong HTTP methods (405), non-JSON bodies (415) and database constraint conflicts (409). Anything unexpected returns 500 with a generic message; stack traces, SQL and class names never reach the client and are logged with the `ref` instead.
 
 During development, Vite proxies every `/api/*` request from port 5173 to the backend on port 8080, so no CORS configuration is needed.
 
@@ -430,7 +475,8 @@ RedLink/
     │   ├── model/                   # JPA entities (database tables)
     │   │   ├── enums/               # Role, BloodGroup, statuses, urgency
     │   │   └── converter/           # BloodGroup ⇄ "A+" database converter
-    │   ├── dto/                     # Request/response objects
+    │   ├── dto/                     # Request/response records, ApiError
+    │   ├── exception/               # ApiException types + GlobalExceptionHandler
     │   └── BackendApplication.java  # Entry point
     ├── src/main/resources/
     │   ├── db/migration/                  # Flyway SQL migrations (V1__…, V2__…)
@@ -540,6 +586,7 @@ Start the backend first (step 4). All endpoints are under `http://localhost:8080
 | Method | Endpoint | Description | Status |
 |---|---|---|---|
 | `GET` | `/api/donors` | List all donors (name and phone come from the donor's user) | ✅ Implemented |
+| `GET` | `/api/donors/{id}` | One donor; `404` in the [error format](#error-format) if the ID doesn't exist | ✅ Implemented |
 
 Donors can't be created through the API yet. That will be `POST /api/auth/register/donor` (see [Planned endpoints](#planned-endpoints)).
 
@@ -563,13 +610,18 @@ A donor always needs a `users` row first; the database rejects a donor without o
 
 ```bash
 curl http://localhost:8080/api/donors
+curl http://localhost:8080/api/donors/1
+curl -i http://localhost:8080/api/donors/99    # 404 in the error format
 ```
 
 **Windows PowerShell:**
 
 ```powershell
 Invoke-RestMethod http://localhost:8080/api/donors
+Invoke-RestMethod http://localhost:8080/api/donors/1
 ```
+
+`Invoke-RestMethod` throws on 4xx/5xx responses; use `curl.exe -i` to see the error body.
 
 In Windows PowerShell 5.1, `curl` is an alias for `Invoke-WebRequest`. Use `curl.exe` if you want real curl.
 
@@ -626,6 +678,10 @@ cd backend
 |---|---|:---:|
 | `BackendApplicationTests` (`contextLoads`) | The app starts, Flyway migrations run and every entity matches its table | ✅ |
 | `BloodGroupTest` | Every blood group converts to its label (`A+`) and back | ❌ |
+| `DonorControllerTest` | Donor endpoints and their error responses (service mocked with `@WebMvcTest`) | ❌ |
+| `GlobalExceptionHandlerTest` | Every error case produces the error format, and 500s don't leak internals (uses a test-only controller) | ❌ |
+
+To run only the tests that don't need a database: `./mvnw test -Dtest="BloodGroupTest,DonorControllerTest,GlobalExceptionHandlerTest"`
 
 ### Planned endpoints
 
@@ -735,7 +791,7 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Frontend → backend → database connection (`/api/donors`)
 - [x] Full database schema (users, hospitals, requests, responses, donations, notifications)
 - [x] Flyway database migrations
-- [ ] DTOs, input validation and global error handling
+- [x] Service layer, DTOs, input validation and global error handling
 - [ ] Authentication and roles with Spring Security + JWT
 - [ ] Startup seeder for the first admin account
 - [ ] Hospital registration (hospital + first staff user) and admin approval with rejection reason
