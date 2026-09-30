@@ -1,5 +1,6 @@
 package com.redlink.backend.model;
 
+import com.redlink.backend.model.enums.BloodGroup;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,10 +18,14 @@ public class Donor {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String name;
-    private String bloodGroup;
-    private String phone;
+    // Name, phone and email live on the user
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id")
+    private User user;
+
+    private BloodGroup bloodGroup;
+    private LocalDate dateOfBirth;
     private String city;
-    private boolean available;
+    private boolean available = true;
     private LocalDate lastDonationDate;
 }
