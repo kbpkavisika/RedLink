@@ -1,8 +1,10 @@
 package com.redlink.backend.service;
 
+import com.redlink.backend.dto.auth.ChangePasswordRequest;
 import com.redlink.backend.dto.auth.CurrentUserResponse;
 import com.redlink.backend.dto.auth.LoginRequest;
 import com.redlink.backend.dto.auth.LoginResponse;
+import com.redlink.backend.exception.BadRequestException;
 import com.redlink.backend.exception.ForbiddenException;
 import com.redlink.backend.exception.UnauthorizedException;
 import com.redlink.backend.model.User;
@@ -69,5 +71,27 @@ public class AuthService {
     // GET /api/auth/me: restores the session in the frontend after a page reload
     public CurrentUserResponse me() {
         return CurrentUserResponse.from(currentUser.require());
+    }
+
+    /**
+     * Replaces the signed-in user's password and clears mustChangePassword.
+     * A wrong current password is a 400 on the field, not a 401: a 401 would make the frontend sign the user out.
+     */
+    @Transactional
+    public CurrentUserResponse changePassword(ChangePasswordRequest request) {
+        User user = currentUser.require();
+
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new BadRequestException("Your current password is incorrect.",
+                    "currentPassword", "is incorrect");
+        }
+        if (request.newPassword().equals(request.currentPassword())) {
+            throw new BadRequestException("Choose a new password that is different from your current one.",
+                    "newPassword", "must be different from your current password");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        user.setMustChangePassword(false);
+        return CurrentUserResponse.from(user); // saved when the transaction commits
     }
 }

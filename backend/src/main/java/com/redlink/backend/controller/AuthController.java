@@ -1,5 +1,6 @@
 package com.redlink.backend.controller;
 
+import com.redlink.backend.dto.auth.ChangePasswordRequest;
 import com.redlink.backend.dto.auth.CurrentUserResponse;
 import com.redlink.backend.dto.auth.LoginRequest;
 import com.redlink.backend.dto.auth.LoginResponse;
@@ -46,5 +47,11 @@ public class AuthController {
     @GetMapping("/me")
     public CurrentUserResponse me() {
         return authService.me();
+    }
+
+    // Returns the updated user (mustChangePassword is now false)
+    @PatchMapping("/me/password")
+    public CurrentUserResponse changePassword(@Valid @RequestBody ChangePasswordRequest body) {
+        return authService.changePassword(body);
     }
 }
