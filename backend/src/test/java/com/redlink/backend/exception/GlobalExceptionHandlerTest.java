@@ -1,6 +1,7 @@
 package com.redlink.backend.exception;
 
 import com.redlink.backend.model.enums.BloodGroup;
+import com.redlink.backend.security.SecurityConfig;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -11,13 +12,14 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.web.bind.annotation.*;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,11 +29,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * so the handler is proven before real endpoints with request bodies rely on it.
  */
 @WebMvcTest(controllers = GlobalExceptionHandlerTest.TestController.class)
-@Import(GlobalExceptionHandlerTest.TestController.class)
+@Import({GlobalExceptionHandlerTest.TestController.class, SecurityConfig.class})
 class GlobalExceptionHandlerTest {
 
     @Autowired
     private MockMvc mvc;
+
+    // Every request in this class comes from a signed-in user, so the security rules let it through
+    private static MockHttpServletRequestBuilder get(String url) {
+        return MockMvcRequestBuilders.get(url).with(jwt());
+    }
+
+    private static MockHttpServletRequestBuilder post(String url) {
+        return MockMvcRequestBuilders.post(url).with(jwt());
+    }
 
     record SampleRequest(@NotBlank String name, @NotNull @Positive Integer units, BloodGroup bloodGroup) {
     }
