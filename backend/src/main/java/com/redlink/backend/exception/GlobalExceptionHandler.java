@@ -19,9 +19,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Turns every exception from any controller into an {@link ApiError}.
@@ -141,14 +139,7 @@ public class GlobalExceptionHandler {
 
     private ApiError error(HttpStatus status, String message,
                            List<ApiError.FieldError> fields, HttpServletRequest request) {
-        return new ApiError(status.value(), status.getReasonPhrase(), message, fields,
-                newRef(), Instant.now(), request.getRequestURI());
-    }
-
-    // Short, readable reference such as "7f3a-19c2"
-    private static String newRef() {
-        String hex = UUID.randomUUID().toString().replace("-", "");
-        return hex.substring(0, 4) + "-" + hex.substring(4, 8);
+        return ApiError.of(status, message, fields, request.getRequestURI());
     }
 
     private static String describe(Class<?> type) {
