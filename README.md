@@ -49,8 +49,12 @@ Three roles, each with its own view of the system.
 
 1. A hospital account must be **approved by an admin** before it can post requests.
 2. A donor is **eligible** only if they are marked available **and** at least **90 days** have passed since their last donation.
-3. A donor can **respond to a given request only once**.
+3. A donor **responds to a request once** (accept or decline). After accepting, they may **withdraw** while the request is still open, but they cannot respond to it again.
 4. A request starts as `OPEN` and ends as `FULFILLED`, `CANCELLED` or `EXPIRED`. A closed request cannot be reopened.
+5. When a request is posted, the system notifies the **top-ranked matches**: `units needed × urgency multiplier`, capped at 25. If there are fewer matches than that, all of them are notified.
+6. Registering a hospital also creates its **first staff account**. The admin adds any further staff.
+7. The **first admin is created automatically** at startup from environment variables. Nobody can register themselves as an admin.
+8. **Password reset by email is not in v1.** An admin sets a temporary password, and the user changes it after logging in.
 
 ---
 
