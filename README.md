@@ -6,7 +6,7 @@ A blood donor matching and request management system that connects hospitals wit
 
 RedLink lets a hospital post a request and instantly get a ranked list of compatible, available donors nearby, turning a manual search into a database query.
 
-> **Status: early development.** The project skeleton is in place: React frontend, Spring Boot API and PostgreSQL. The full database schema is created by Flyway, the API has its service layer and error handling, and the donor read endpoints work end to end. Everything else below describes the target design. See [Roadmap](#roadmap) for what is built and what is planned.
+> **Status: early development.** The project skeleton is in place: React frontend, Spring Boot API and PostgreSQL. The full database schema is created by Flyway, the API has its service layer and error handling, and the donor read endpoints work end to end. The frontend has its design system, app shell and role-based routing; sign-in arrives with authentication. Everything else below describes the target design. See [Roadmap](#roadmap) for what is built and what is planned.
 
 ---
 
@@ -17,6 +17,7 @@ RedLink lets a hospital post a request and instantly get a ranked list of compat
 - [How It Works](#how-it-works)
 - [Tech Stack](#tech-stack)
 - [Architecture](#architecture)
+- [Frontend](#frontend)
 - [Database Design](#database-design)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
@@ -209,7 +210,7 @@ redlink.matching.max-notified=25
 | CI/CD | GitHub Actions (CI live, CD planned) | Tests gate every merge and deploy |
 | Hosting | Vercel (frontend), Render (API), Neon (PostgreSQL) *(planned)* | Free tiers suitable for a portfolio project |
 
-Frontend libraries: React Router, Axios, TanStack Query, React Hook Form + Zod, Tailwind CSS, Recharts, React Hot Toast.
+Frontend libraries: React Router, Axios, TanStack Query, React Hook Form + Zod, Tailwind CSS, Lucide icons, clsx, Recharts, React Hot Toast.
 
 ---
 
@@ -277,6 +278,87 @@ Services signal expected problems by throwing one of these; the handler picks th
 The handler also covers invalid fields (400), broken JSON or an unknown value such as `"bloodGroup": "C+"` (400), a non-numeric ID (400), unknown URLs (404), wrong HTTP methods (405), non-JSON bodies (415) and database constraint conflicts (409). Anything unexpected returns 500 with a generic message; stack traces, SQL and class names never reach the client and are logged with the `ref` instead.
 
 During development, Vite proxies every `/api/*` request from port 5173 to the backend on port 8080, so no CORS configuration is needed.
+
+---
+
+## Frontend
+
+The React app follows the design system in [`design.md`](design.md). It is a web dashboard only; there is no mobile app, but every page works at tablet and phone widths.
+
+### How it fits together
+
+```
+main.tsx
+  └─ QueryClientProvider        caches API data, retries server errors once, never 4xx
+       └─ AuthProvider          who is signed in: user, role, login(), logout()
+            └─ App (routes)     role guards → AppShell (sidebar + top bar) → page
+       └─ Toaster               short confirmations after actions
+
+api/client.ts (Axios)
+  ├─ adds  Authorization: Bearer <token>
+  └─ turns every failure into an ApiError; a 401 on a signed-in request signs the user out
+```
+
+### Design tokens
+
+All colours, fonts, the type scale, radii and shadows from `design.md` are Tailwind v4 theme variables in [`src/index.css`](frontend/src/index.css), so they become classes:
+
+| Token | Classes |
+|---|---|
+| `--color-primary`, `--color-ink`, `--color-text-muted`, … | `bg-primary`, `text-ink`, `text-text-muted`, `border-border` |
+| `--font-display`, `--font-mono` | `font-display`, `font-mono` |
+| `--text-display-lg`, `--text-title-md`, `--text-caption`, … | `text-display-lg` (size, line height and weight together) |
+| `--radius-2xl`, `--shadow-urgent`, `--shadow-focus` | `rounded-2xl`, `shadow-urgent`, `shadow-focus` |
+
+Tailwind's default palette is switched off, so off-brand colours such as `text-gray-500` don't exist. Every variable is also available in plain CSS as `var(--color-ink)`.
+
+### UI components
+
+Import from [`src/components/ui`](frontend/src/components/ui/): `import { Button, Panel } from '../components/ui'`.
+
+| Component | Use |
+|---|---|
+| `Button`, `LinkButton` | `primary` (one per view), `dark`, `outline`, `text`, `icon` (requires `aria-label`); sizes `sm`, `md`, `lg`; `loading` |
+| `Input` | Label, hint, error message wired to `aria-describedby`; works with React Hook Form |
+| `Badge`, `Chip`, `UrgencyTag`, `BloodGroupBadge` | Status pills, filter chips, urgency (only Critical is red), blood group tiles shown with a true minus sign (`A−`) |
+| `Panel`, `Table` | The container for all data; a typed table with 56px rows |
+| `Switch`, `StepProgress` | Availability toggle; multi-stage status such as hospital approval |
+| `StateView`, `Skeleton` | The six screen states below |
+
+Every data view shows one of six states, all from `StateView`:
+
+| State | When |
+|---|---|
+| `loading` | The query is pending; skeleton rows mirror the real layout |
+| `empty` | Nothing exists yet; explain the value and offer one primary action |
+| `no-results` | Filters matched nothing; keep the chips visible and suggest alternatives |
+| `error` | The request failed; shows the `ApiError` message, **Try again** and `Error 504 · ref 7f3a-19c2` |
+| `success` | An action finished; say what happened in numbers and link to the next step |
+| `blocked` | Not allowed yet, e.g. a hospital awaiting approval; say why, who and how long |
+
+### Routes and roles
+
+| Path | Who |
+|---|---|
+| `/login`, `/register/donor`, `/register/hospital`, `/forgot-password` | Public (signed-in users are sent home) |
+| `/hospital`, `/hospital/requests`, `/hospital/requests/new`, `/hospital/requests/:id` | Hospital staff |
+| `/donor`, `/donor/requests`, `/donor/history`, `/donor/profile` | Donors |
+| `/admin/hospitals`, `/admin/users`, `/admin/requests`, `/admin/donors` | Admins |
+| `/change-password` | Any signed-in user |
+
+`/` sends each user to their home. `RequireAuth` sends signed-out users to `/login?from=…`, users with a temporary password to `/change-password`, and users on another role's page back to their own home. This is for convenience only: the backend's 401 and 403 are the real protection. Pages not built yet show a "coming soon" placeholder.
+
+### Development tools
+
+With `npm run dev`, **http://localhost:5173/dev/components** shows every component and screen state and lets you **sign in as a test user** (admin, hospital staff approved / pending / rejected, donor, donor with a temporary password) before the real login exists. The gallery and the test sign-in are left out of production builds.
+
+### Adding a page
+
+1. **API function** in `src/api/` (e.g. `getRequests()`), plus query keys.
+2. **Query hook** in `src/hooks/` typed with `ApiError`: `useQuery<BloodRequest[], ApiError>(…)`.
+3. **Page** in `src/pages/<role>/` using `Panel` + `Table` and a `StateView` for loading, error and empty. [`DonorsPage`](frontend/src/pages/admin/DonorsPage.tsx) is the reference.
+4. **Route** in [`App.tsx`](frontend/src/App.tsx) inside the right role group; add a sidebar link in [`navigation.ts`](frontend/src/components/layout/navigation.ts) if it needs one.
+5. **Types** in `src/types/index.ts`, matching the backend DTO exactly.
 
 ---
 
@@ -458,13 +540,19 @@ RedLink/
 │
 ├── frontend/                        # React + TypeScript (Vite)
 │   ├── src/
-│   │   ├── api/client.ts            # Axios instance (baseURL: /api)
-│   │   ├── components/              # Reusable UI components
-│   │   ├── hooks/                   # Custom hooks
-│   │   ├── pages/                   # Route pages (Home, Donors, …)
-│   │   ├── types/index.ts           # TypeScript types matching backend DTOs
+│   │   ├── api/                     # Axios client (token + ApiError) and API functions
+│   │   ├── auth/                    # AuthProvider, useAuth, route guards
+│   │   ├── components/
+│   │   │   ├── ui/                  # Design-system components (Button, Panel, StateView, …)
+│   │   │   └── layout/              # AppShell, sidebar navigation, user menu
+│   │   ├── dev/                     # Component gallery + test sign-in (development only)
+│   │   ├── hooks/                   # TanStack Query hooks (useDonors, …)
+│   │   ├── lib/                     # Query client, token store, ApiError, formatting, roles
+│   │   ├── pages/                   # Route pages, grouped by role (admin/, hospital/, …)
+│   │   ├── types/index.ts           # TypeScript types matching backend DTOs and enums
+│   │   ├── index.css                # Design tokens (Tailwind @theme) and base styles
 │   │   ├── App.tsx                  # Routes
-│   │   └── main.tsx                 # Entry point
+│   │   └── main.tsx                 # Entry point and providers
 │   └── vite.config.ts               # Dev server + /api proxy to :8080
 │
 └── backend/                         # Spring Boot REST API
@@ -562,6 +650,8 @@ npm run dev
 
 Open **http://localhost:5173**. Requests to `/api/*` are forwarded to the backend on port 8080.
 
+Until the sign-in form exists, open **http://localhost:5173/dev/components** and pick a test user to explore the app (see [Development tools](#development-tools)).
+
 ### Troubleshooting
 
 | Error | Cause and fix |
@@ -653,7 +743,7 @@ Tip: create a Postman **environment** with a variable `baseUrl = http://localhos
 With both servers running:
 
 - **http://localhost:5173/api/donors** returns the same JSON, which proves the Vite proxy reaches the backend.
-- **http://localhost:5173/donors** shows the donor list page.
+- **http://localhost:5173/admin/donors** shows the donor list page. Sign in as the **Admin** test user at `/dev/components` first. Stop the backend and click **Try again** to see the error state.
 
 ### Check the data in the database
 
@@ -792,6 +882,7 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Full database schema (users, hospitals, requests, responses, donations, notifications)
 - [x] Flyway database migrations
 - [x] Service layer, DTOs, input validation and global error handling
+- [x] Frontend foundation: design tokens, UI components, screen states, auth plumbing, role-based routing and app shell
 - [ ] Authentication and roles with Spring Security + JWT
 - [ ] Startup seeder for the first admin account
 - [ ] Hospital registration (hospital + first staff user) and admin approval with rejection reason
@@ -801,7 +892,8 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [ ] Configurable notification count (units × urgency multiplier, capped)
 - [ ] Donor responses (accept, decline, withdraw) and donation history
 - [ ] Notifications
-- [ ] Role-based dashboards in the frontend
+- [ ] Role-based dashboards in the frontend (placeholders in place)
+- [ ] Frontend component tests (Vitest + Testing Library)
 - [x] GitHub Actions CI (backend tests + frontend lint/build on every pull request)
 - [x] Branch protection on `main` (pull request + passing CI required)
 - [ ] Dockerize the backend
