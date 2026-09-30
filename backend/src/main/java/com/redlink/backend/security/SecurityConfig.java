@@ -1,5 +1,6 @@
 package com.redlink.backend.security;
 
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.redlink.backend.config.CorsProperties;
 import com.redlink.backend.config.JwtProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -12,9 +13,13 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -87,6 +92,12 @@ public class SecurityConfig {
         return new SecretKeySpec(properties.secret().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
     }
 
+    // Signs new tokens at sign-in (used by JwtService)
+    @Bean
+    JwtEncoder jwtEncoder(SecretKey jwtSigningKey) {
+        return new NimbusJwtEncoder(new ImmutableSecret<>(jwtSigningKey));
+    }
+
     // Rejects tokens with a bad signature, an unexpected algorithm, a wrong issuer, or past their expiry
     @Bean
     JwtDecoder jwtDecoder(SecretKey jwtSigningKey, JwtProperties properties) {
@@ -107,6 +118,13 @@ public class SecurityConfig {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(authorities);
         return converter;
+    }
+
+    // BCrypt (stored as "{bcrypt}$2a$10$…"). The prefix lets a stronger algorithm be adopted later
+    // without breaking existing hashes.
+    @Bean
+    PasswordEncoder passwordEncoder() {
+        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
     // Only the configured frontend origins may call the API from a browser (none in development)
