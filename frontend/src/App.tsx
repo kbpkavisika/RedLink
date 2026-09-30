@@ -6,7 +6,7 @@ import { RoleRedirect } from './auth/RoleRedirect';
 import { AppShell } from './components/layout/AppShell';
 import { PublicLayout } from './components/layout/PublicLayout';
 import { ComingSoonPage } from './pages/ComingSoonPage';
-import Donors from './pages/Donors';
+import { DonorsPage } from './pages/admin/DonorsPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -107,7 +107,7 @@ export default function App() {
                 path="/admin/requests"
                 element={<ComingSoonPage title="All requests" description="Requests across every hospital." />}
               />
-              <Route path="/admin/donors" element={<Donors />} />
+              <Route path="/admin/donors" element={<DonorsPage />} />
             </Route>
           </Route>
         </Route>
