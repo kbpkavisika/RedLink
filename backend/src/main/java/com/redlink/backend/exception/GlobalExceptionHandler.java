@@ -34,7 +34,7 @@ public class GlobalExceptionHandler {
     // Thrown on purpose by services: NotFound, Conflict, Forbidden, BadRequest
     @ExceptionHandler(ApiException.class)
     ResponseEntity<ApiError> handleApi(ApiException ex, HttpServletRequest request) {
-        return build(ex.getStatus(), ex.getMessage(), List.of(), request);
+        return build(ex.getStatus(), ex.getMessage(), ex.getFieldErrors(), request);
     }
 
     // @Valid on a request body failed

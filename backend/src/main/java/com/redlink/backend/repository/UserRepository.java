@@ -9,4 +9,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // Emails are stored lowercased (see Emails.normalize), so pass a normalized email
     Optional<User> findByEmail(String email);
+
+    boolean existsByEmail(String email);
 }
