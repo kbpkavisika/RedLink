@@ -6,7 +6,7 @@ A blood donor matching and request management system that connects hospitals wit
 
 RedLink lets a hospital post a request and instantly get a ranked list of compatible, available donors nearby, turning a manual search into a database query.
 
-> **Status: early development.** The project skeleton is in place: React frontend, Spring Boot API and PostgreSQL. The first donor endpoints work end to end. Everything else below describes the target design. See [Roadmap](#roadmap) for what is built and what is planned.
+> **Status: early development.** The project skeleton is in place: React frontend, Spring Boot API and PostgreSQL. The full database schema is created by Flyway, and the donor list endpoint works end to end. Everything else below describes the target design. See [Roadmap](#roadmap) for what is built and what is planned.
 
 ---
 
@@ -389,7 +389,19 @@ erDiagram
 
 - **Naming:** Java uses camelCase (`bloodGroup`); the database uses snake_case (`blood_group`). Hibernate converts between them automatically.
 - **Speed:** indexes on `donors (blood_group, available, city)` and `blood_requests (status, city)` keep the matching query fast.
-- **Current state:** only the `donors` table exists so far. For now it stores `name` and `phone` directly; these move to `users` when login is added. Tables are created automatically from the Java entities (`ddl-auto=update`). Flyway migrations will replace this before deployment.
+- **Blood groups:** the Java enum uses `A_POS`, `A_NEG`, … because Java names can't contain `+` or `-`. The database and the API always use the label (`A+`, `A-`, …); `BloodGroupConverter` translates between them.
+
+### Migrations (Flyway)
+
+All 7 tables are created by **Flyway** from SQL files in `backend/src/main/resources/db/migration/`, not by Hibernate.
+
+- On startup, Flyway runs any migration that hasn't run yet and records it in the `flyway_schema_history` table.
+- Hibernate runs with `ddl-auto=validate`: it never changes tables, it only checks that the Java entities match them. If they don't, the app refuses to start and names the mismatch.
+- **Never edit a migration that has already run.** To change the schema, add a new file with the next version number, e.g. `V2__add_donor_notes.sql`.
+
+| Migration | What it does |
+|---|---|
+| `V1__initial_schema.sql` | Creates all 7 tables with their keys, `CHECK` constraints and indexes |
 
 ---
 
@@ -416,9 +428,12 @@ RedLink/
     │   ├── service/                 # Business logic & matching engine
     │   ├── repository/              # Spring Data JPA repositories
     │   ├── model/                   # JPA entities (database tables)
+    │   │   ├── enums/               # Role, BloodGroup, statuses, urgency
+    │   │   └── converter/           # BloodGroup ⇄ "A+" database converter
     │   ├── dto/                     # Request/response objects
     │   └── BackendApplication.java  # Entry point
     ├── src/main/resources/
+    │   ├── db/migration/                  # Flyway SQL migrations (V1__…, V2__…)
     │   ├── application.properties         # Shared config (committed)
     │   └── application-local.properties   # Your DB password (git-ignored)
     └── pom.xml
@@ -487,7 +502,7 @@ Tomcat started on port 8080 (http)
 Started BackendApplication in X seconds
 ```
 
-Tables are created automatically at this point. **Leave this terminal open.**
+On the first run, Flyway creates all the tables. Look for `Successfully applied 1 migration to schema "public"`. **Leave this terminal open.**
 
 ### 5. Start the frontend
 
@@ -511,6 +526,8 @@ Open **http://localhost:5173**. Requests to `/api/*` are forwarded to the backen
 | `Port 8080 was already in use` | Another app is using the port; stop it or change `server.port` and the proxy target in `vite.config.ts` |
 | Frontend shows no data / 404 on `/api/...` | The backend isn't running, or the endpoint path doesn't start with `/api` |
 | `BUILD SUCCESS` but the app stopped | Maven finished, but the app failed. Scroll up to the first `ERROR` / `Caused by:` line |
+| `Found non-empty schema(s) "public" but no schema history table` | Your database has tables from before Flyway was added. Recreate it: in the Query Tool on the `postgres` database run `DROP DATABASE "redLink";` then `CREATE DATABASE "redLink";` (this deletes its data) |
+| `Schema-validation: missing column` / `wrong column type` | A Java entity doesn't match the migrations. Fix the entity, or add a new migration; don't edit one that has already run |
 
 ---
 
@@ -522,31 +539,35 @@ Start the backend first (step 4). All endpoints are under `http://localhost:8080
 
 | Method | Endpoint | Description | Status |
 |---|---|---|---|
-| `GET` | `/api/donors` | List all donors | ✅ Implemented |
-| `POST` | `/api/donors` | Create a donor | ✅ Implemented |
+| `GET` | `/api/donors` | List all donors (name and phone come from the donor's user) | ✅ Implemented |
+
+Donors can't be created through the API yet. That will be `POST /api/auth/register/donor` (see [Planned endpoints](#planned-endpoints)).
+
+### Add a sample donor
+
+Until registration exists, add test data in pgAdmin. Open the **Query Tool** on `redLink` and run:
+
+```sql
+INSERT INTO users (email, password_hash, full_name, phone, role)
+VALUES ('kamal@mail.lk', 'not-a-real-hash', 'Kamal Perera', '0771234567', 'DONOR');
+
+INSERT INTO donors (user_id, blood_group, date_of_birth, city, last_donation_date)
+VALUES ((SELECT id FROM users WHERE email = 'kamal@mail.lk'), 'O+', '1995-04-12', 'Colombo', '2026-05-01');
+```
+
+A donor always needs a `users` row first; the database rejects a donor without one.
 
 ### Option 1: Terminal
 
 **Git Bash / macOS / Linux (curl):**
 
 ```bash
-# Create a donor
-curl -X POST http://localhost:8080/api/donors \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Kamal Perera","bloodGroup":"O+","phone":"0771234567","city":"Colombo","available":true,"lastDonationDate":"2026-05-01"}'
-
-# List donors
 curl http://localhost:8080/api/donors
 ```
 
 **Windows PowerShell:**
 
 ```powershell
-# Create a donor
-Invoke-RestMethod -Uri http://localhost:8080/api/donors -Method Post -ContentType "application/json" `
-  -Body '{"name":"Kamal Perera","bloodGroup":"O+","phone":"0771234567","city":"Colombo","available":true,"lastDonationDate":"2026-05-01"}'
-
-# List donors
 Invoke-RestMethod http://localhost:8080/api/donors
 ```
 
@@ -570,10 +591,8 @@ In Windows PowerShell 5.1, `curl` is an alias for `Invoke-WebRequest`. Use `curl
 
 ### Option 2: Postman
 
-1. Create a new request: **POST** `http://localhost:8080/api/donors`
-2. **Body** → **raw** → **JSON**, and paste the donor JSON above
-3. Click **Send**. You should get `200 OK` with the saved donor and its new `id`
-4. Change the method to **GET** and send again to list all donors
+1. Create a new request: **GET** `http://localhost:8080/api/donors`
+2. Click **Send**. You should get `200 OK` with the JSON above
 
 Tip: create a Postman **environment** with a variable `baseUrl = http://localhost:8080/api` and use `{{baseUrl}}/donors`. Switching to the deployed API later then only needs a different environment.
 
@@ -589,7 +608,9 @@ With both servers running:
 In pgAdmin: **redLink → Schemas → public → Tables → donors**, then right-click and choose **View/Edit Data → All Rows**. Or open the Query Tool on `redLink` and run:
 
 ```sql
-SELECT * FROM donors;
+SELECT d.id, u.full_name, d.blood_group, d.city, d.available
+FROM donors d
+JOIN users u ON u.id = d.user_id;
 ```
 
 If the table doesn't appear, right-click **Tables** and choose **Refresh**.
@@ -601,7 +622,10 @@ cd backend
 ./mvnw test
 ```
 
-The current test (`contextLoads`) starts the whole application, so **PostgreSQL must be running** for it to pass.
+| Test | What it checks | Needs PostgreSQL? |
+|---|---|:---:|
+| `BackendApplicationTests` (`contextLoads`) | The app starts, Flyway migrations run and every entity matches its table | ✅ |
+| `BloodGroupTest` | Every blood group converts to its label (`A+`) and back | ❌ |
 
 ### Planned endpoints
 
@@ -709,7 +733,8 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 
 - [x] Project setup: React + TypeScript frontend, Spring Boot backend, PostgreSQL
 - [x] Frontend → backend → database connection (`/api/donors`)
-- [ ] Full database schema (users, hospitals, requests, responses, donations, notifications)
+- [x] Full database schema (users, hospitals, requests, responses, donations, notifications)
+- [x] Flyway database migrations
 - [ ] DTOs, input validation and global error handling
 - [ ] Authentication and roles with Spring Security + JWT
 - [ ] Startup seeder for the first admin account
@@ -721,7 +746,6 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [ ] Donor responses (accept, decline, withdraw) and donation history
 - [ ] Notifications
 - [ ] Role-based dashboards in the frontend
-- [ ] Flyway database migrations
 - [x] GitHub Actions CI (backend tests + frontend lint/build on every pull request)
 - [x] Branch protection on `main` (pull request + passing CI required)
 - [ ] Dockerize the backend
