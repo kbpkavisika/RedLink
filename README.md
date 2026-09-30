@@ -41,9 +41,11 @@ Three roles, each with its own view of the system.
 
 | Role | Can do |
 |---|---|
-| **Admin** | Approve or reject hospital registrations, manage users, view all requests |
-| **Hospital staff** | Create blood requests, view matched donors, track responses, mark requests fulfilled |
-| **Donor** | Manage profile and availability, view incoming requests, accept or decline, see donation history |
+| **Admin** | Approve or reject hospital registrations (with a reason), manage users, add staff to a hospital, reset a user's password, view all requests |
+| **Hospital staff** | Register their hospital, create blood requests, view matched donors, track responses (including withdrawals), mark requests fulfilled or cancelled |
+| **Donor** | Manage profile and availability, view incoming requests, accept or decline, withdraw after accepting, see donation history |
+
+Every user can also change their own password.
 
 ### Core business rules
 
@@ -78,6 +80,10 @@ sequenceDiagram
     D->>API: GET /api/donor/requests
     D->>API: POST /api/requests/{id}/responses (ACCEPTED / DECLINED)
     API->>DB: Save response (one per donor per request)
+    opt Donor can't make it
+        D->>API: PATCH /api/requests/{id}/responses/me → WITHDRAWN
+        API->>DB: Update response, notify hospital staff
+    end
     H->>API: GET /api/requests/{id}/responses
     H->>API: PATCH /api/requests/{id}/status → FULFILLED
     API->>DB: Record donation, update donor's last donation date
@@ -87,8 +93,26 @@ sequenceDiagram
 
 ```
 Hospital registers ──► status PENDING ──► Admin reviews ──┬──► APPROVED  (can post requests)
-                                                          └──► REJECTED  (cannot post)
+                                                          └──► REJECTED  (cannot post, reason shown)
 ```
+
+One registration form creates both the hospital (`PENDING`) and its first staff user (`HOSPITAL_STAFF`) in a single transaction. If the email or registration number already exists, nothing is saved.
+
+The staff user can log in at every stage, so they always see where their hospital stands:
+
+| Hospital status | What staff see | Can post requests? |
+|---|---|:---:|
+| `PENDING` | "An admin is reviewing your registration. This usually takes 1–2 working days." | ❌ |
+| `APPROVED` | Full dashboard | ✅ |
+| `REJECTED` | "Registration was not approved", with the admin's reason | ❌ |
+
+Further staff accounts are created by the admin in **Manage users**.
+
+### Accounts and passwords
+
+- **First admin:** when the backend starts, a seeder checks whether any admin exists. If none does, it creates one from `redlink.admin.email` and `redlink.admin.password`, which come from `application-local.properties` locally or from environment variables when deployed. The password is never committed.
+- **Registration** only creates `DONOR` or `HOSPITAL_STAFF` users. Any `role` sent in the request body is ignored.
+- **Forgotten password (v1):** the "Forgot password?" link tells the user to contact the admin. The admin sets a temporary password, and `must_change_password` makes the user choose a new one at their next login.
 
 ### Request lifecycle
 
@@ -97,6 +121,24 @@ Hospital registers ──► status PENDING ──► Admin reviews ──┬─
   OPEN ─────┼──► CANCELLED   (hospital withdrew the request)
             └──► EXPIRED     (needed-by date passed with no fulfilment)
 ```
+
+### Donor response lifecycle
+
+```
+            ┌──► ACCEPTED ──► WITHDRAWN   (donor can't make it after all)
+ no reply ──┤
+            └──► DECLINED
+```
+
+- Each donor has **at most one** response per request. Withdrawing updates that row; it never adds a new one.
+- Only `ACCEPTED` → `WITHDRAWN` is allowed, and only while the request is `OPEN`. `DECLINED` and `WITHDRAWN` are final.
+- When a donor withdraws, the hospital's staff are notified ("Kamal Perera can no longer donate for #RQ-5").
+
+| Invalid action | API response |
+|---|---|
+| Responding a second time | `409 Conflict`: "You've already responded to this request." |
+| Withdrawing a declined response | `409 Conflict`: "Only accepted responses can be withdrawn." |
+| Withdrawing after the request closed | `409 Conflict`: "This request is already closed." |
 
 ### Matching engine
 
@@ -113,6 +155,31 @@ Matches are **ranked** by:
 1. Exact blood group match before a compatible substitute (this saves scarce types such as O−)
 2. Same city as the request before other cities
 3. Longest time since last donation first
+
+**How many donors are notified.** Not every match is notified, so donors aren't flooded with requests that will be filled without them:
+
+```
+notified = min(units_needed × urgency multiplier, 25, number of matches)
+```
+
+| Urgency | Multiplier | 1 unit | 2 units | 4 units |
+|---|:---:|:---:|:---:|:---:|
+| `LOW` | 2 | 2 | 4 | 8 |
+| `MEDIUM` | 3 | 3 | 6 | 12 |
+| `HIGH` | 5 | 5 | 10 | 20 |
+| `CRITICAL` | 8 | 8 | 16 | 25 (cap) |
+
+Example: 2 units of A+ at `HIGH` urgency with 46 matches notifies the top 10. The other 36 still appear in the hospital's ranked match list, so staff can contact them directly. If there are no matches, the request is still saved and the hospital sees suggestions instead.
+
+The multipliers and cap live in `application.properties`, so they can be tuned without code changes:
+
+```properties
+redlink.matching.multiplier.low=2
+redlink.matching.multiplier.medium=3
+redlink.matching.multiplier.high=5
+redlink.matching.multiplier.critical=8
+redlink.matching.max-notified=25
+```
 
 **Red cell compatibility** (who a recipient can receive from):
 
@@ -221,6 +288,7 @@ erDiagram
 | `role` | varchar | | `ADMIN`, `HOSPITAL_STAFF` or `DONOR` |
 | `hospital_id` | bigint | 🔗 hospitals | Only set for hospital staff |
 | `enabled` | boolean | | `false` blocks login |
+| `must_change_password` | boolean | | `true` after an admin sets a temporary password; the user must choose a new one at next login |
 | `created_at` | timestamp | | When the account was created |
 
 #### 🏥 hospitals
@@ -236,6 +304,7 @@ erDiagram
 | `status` | varchar | | `PENDING` → `APPROVED` or `REJECTED` |
 | `approved_by` | bigint | 🔗 users | The admin who approved it |
 | `approved_at` | timestamp | | When it was approved |
+| `rejection_reason` | varchar | | Why the admin rejected it (only set when `REJECTED`) |
 | `created_at` | timestamp | | When it registered |
 
 #### 🩸 donors
@@ -273,10 +342,11 @@ erDiagram
 | `id` | bigint | 🔑 | Auto-generated ID |
 | `request_id` | bigint | 🔗 blood_requests | Which request |
 | `donor_id` | bigint | 🔗 donors | Which donor |
-| `status` | varchar | | `ACCEPTED` or `DECLINED` |
-| `responded_at` | timestamp | | When the donor answered |
+| `status` | varchar | | `ACCEPTED`, `DECLINED` or `WITHDRAWN` |
+| `responded_at` | timestamp | | When the donor first answered |
+| `updated_at` | timestamp | | When the status last changed (e.g. withdrawn) |
 
-⭐ `request_id` + `donor_id` together are unique, so a donor can't answer the same request twice.
+⭐ `request_id` + `donor_id` together are unique, so a donor can't answer the same request twice. Withdrawing updates the existing row instead of adding a new one.
 
 #### 💉 donations
 
@@ -307,7 +377,10 @@ erDiagram
 | One account per email | `email` is unique in `users` |
 | One donor profile per user | `user_id` is unique in `donors` |
 | A donor answers a request only once | `request_id` + `donor_id` are unique together in `donor_responses` |
+| Only `ACCEPTED` → `WITHDRAWN`, and only while the request is `OPEN` | The service checks the current response and request status before updating |
 | Only approved hospitals can post requests | The service checks `hospitals.status = APPROVED` before saving |
+| Hospital and its first staff user are created together | Both inserts run in one transaction; if either fails, neither is saved |
+| Nobody can register as an admin | Registration endpoints ignore any `role` in the body; the only automatic admin comes from the startup seeder |
 | Donor must wait 90 days between donations | The matching query skips donors whose `last_donation_date` is less than 90 days ago |
 | Only valid values (blood group, role, status) | Java enums + database `CHECK` constraints |
 | Requests need at least 1 unit | `CHECK (units_needed > 0)` |
@@ -534,10 +607,14 @@ The current test (`contextLoads`) starts the whole application, so **PostgreSQL 
 
 | Method | Endpoint | Role | Description |
 |---|---|---|---|
-| `POST` | `/api/auth/register` | Public | Register as donor or hospital |
+| `POST` | `/api/auth/register/donor` | Public | Register as a donor (user + donor profile) |
+| `POST` | `/api/auth/register/hospital` | Public | Register a hospital and its first staff user (hospital starts `PENDING`) |
 | `POST` | `/api/auth/login` | Public | Log in, receive a JWT |
+| `PATCH` | `/api/auth/me/password` | Any logged-in user | Change own password (current + new) |
 | `GET` | `/api/admin/hospitals?status=PENDING` | Admin | Hospitals waiting for approval |
-| `PATCH` | `/api/admin/hospitals/{id}/status` | Admin | Approve or reject a hospital |
+| `PATCH` | `/api/admin/hospitals/{id}/status` | Admin | Approve or reject a hospital (reject requires a reason) |
+| `POST` | `/api/admin/users` | Admin | Add a staff user to an approved hospital, with a temporary password |
+| `PATCH` | `/api/admin/users/{id}/password` | Admin | Set a temporary password (sets `must_change_password`) |
 | `POST` | `/api/requests` | Hospital | Create a blood request |
 | `GET` | `/api/requests/{id}/matches` | Hospital | Ranked list of matching donors |
 | `GET` | `/api/requests/{id}/responses` | Hospital | Donor responses to a request |
@@ -546,6 +623,7 @@ The current test (`contextLoads`) starts the whole application, so **PostgreSQL 
 | `PATCH` | `/api/donor/me/availability` | Donor | Toggle availability |
 | `GET` | `/api/donor/requests` | Donor | Incoming matching requests |
 | `POST` | `/api/requests/{id}/responses` | Donor | Accept or decline (once) |
+| `PATCH` | `/api/requests/{id}/responses/me` | Donor | Withdraw an accepted response while the request is open |
 | `GET` | `/api/donor/donations` | Donor | Donation history |
 
 Once JWT auth is added, protected endpoints need the header `Authorization: Bearer <token>` from the login response.
@@ -634,9 +712,13 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [ ] Full database schema (users, hospitals, requests, responses, donations, notifications)
 - [ ] DTOs, input validation and global error handling
 - [ ] Authentication and roles with Spring Security + JWT
-- [ ] Hospital registration and admin approval
+- [ ] Startup seeder for the first admin account
+- [ ] Hospital registration (hospital + first staff user) and admin approval with rejection reason
+- [ ] Admin user management: add staff users, set temporary passwords
+- [ ] Change own password (forced after a temporary password)
 - [ ] Blood requests and the matching engine
-- [ ] Donor responses and donation history
+- [ ] Configurable notification count (units × urgency multiplier, capped)
+- [ ] Donor responses (accept, decline, withdraw) and donation history
 - [ ] Notifications
 - [ ] Role-based dashboards in the frontend
 - [ ] Flyway database migrations
@@ -644,3 +726,10 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Branch protection on `main` (pull request + passing CI required)
 - [ ] Dockerize the backend
 - [ ] Deployment (Vercel, Render, Neon)
+
+### Later (v2)
+
+- [ ] Password reset by email (one-time link; Mailtrap in development, Brevo or Resend in production)
+- [ ] Hospital staff invite their own colleagues instead of asking the admin
+- [ ] Notify donors in waves: if too few accept in time, notify the next group
+- [ ] When a donor withdraws, automatically notify the next donor in the ranked list
