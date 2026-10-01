@@ -50,7 +50,9 @@ export interface CurrentUser {
   email: string;
   role: Role;
   hospitalId?: number;
+  hospitalName?: string; // only for HOSPITAL_STAFF
   hospitalStatus?: HospitalStatus; // only for HOSPITAL_STAFF; drives the Blocked state
+  hospitalRejectionReason?: string; // only when hospitalStatus is REJECTED
   mustChangePassword: boolean;
 }
 

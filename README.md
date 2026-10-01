@@ -782,7 +782,7 @@ Start the backend first (step 4). All endpoints are under `http://localhost:8080
 | `POST` | `/api/auth/register/donor` | Anyone | Create a donor account (user + donor profile); returns `201` with a token |
 | `POST` | `/api/auth/register/hospital` | Anyone | Register a hospital (`PENDING`) and its first staff user; returns `201` with a token |
 | `POST` | `/api/auth/login` | Anyone | Email + password (+ optional `rememberMe`) → token |
-| `GET` | `/api/auth/me` | Signed in | The current user, including `hospitalStatus` for staff |
+| `GET` | `/api/auth/me` | Signed in | The current user. For staff, also `hospitalName`, `hospitalStatus` and, if rejected, `hospitalRejectionReason` |
 | `PATCH` | `/api/auth/me/password` | Signed in | Change own password (`currentPassword`, `newPassword`) |
 | `GET` | `/api/donors` | Admin | List all donors |
 | `GET` | `/api/donors/{id}` | Admin | One donor; `404` in the [error format](#error-format) if the ID doesn't exist |

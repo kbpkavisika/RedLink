@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HospitalApprovalGate } from './auth/HospitalApprovalGate';
 import { RedirectIfAuthenticated } from './auth/RedirectIfAuthenticated';
 import { RequireAuth } from './auth/RequireAuth';
 import { RoleRedirect } from './auth/RoleRedirect';
@@ -45,19 +46,22 @@ export default function App() {
             <Route path="/change-password" element={<ChangePasswordPage />} />
 
             <Route element={<RequireAuth role="HOSPITAL_STAFF" />}>
-              <Route
-                path="/hospital"
-                element={<ComingSoonPage title="Your dashboard" description="Open requests and responses at a glance." />}
-              />
-              <Route
-                path="/hospital/requests"
-                element={<ComingSoonPage title="Requests" description="Every request your hospital has posted." />}
-              />
-              <Route path="/hospital/requests/new" element={<NewRequestPage />} />
-              <Route
-                path="/hospital/requests/:id"
-                element={<ComingSoonPage title="Request detail" description="Matched donors and their responses." />}
-              />
+              {/* Until the hospital is approved, every page below shows its approval progress instead */}
+              <Route element={<HospitalApprovalGate />}>
+                <Route
+                  path="/hospital"
+                  element={<ComingSoonPage title="Your dashboard" description="Open requests and responses at a glance." />}
+                />
+                <Route
+                  path="/hospital/requests"
+                  element={<ComingSoonPage title="Requests" description="Every request your hospital has posted." />}
+                />
+                <Route path="/hospital/requests/new" element={<NewRequestPage />} />
+                <Route
+                  path="/hospital/requests/:id"
+                  element={<ComingSoonPage title="Request detail" description="Matched donors and their responses." />}
+                />
+              </Route>
             </Route>
 
             <Route element={<RequireAuth role="DONOR" />}>
