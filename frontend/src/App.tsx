@@ -4,7 +4,6 @@ import { RedirectIfAuthenticated } from './auth/RedirectIfAuthenticated';
 import { RequireAuth } from './auth/RequireAuth';
 import { RoleRedirect } from './auth/RoleRedirect';
 import { AppShell } from './components/layout/AppShell';
-import { PublicLayout } from './components/layout/PublicLayout';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
 import { DonorsPage } from './pages/admin/DonorsPage';
@@ -12,6 +11,7 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { RegisterDonorPage } from './pages/RegisterDonorPage';
+import { RegisterHospitalPage } from './pages/RegisterHospitalPage';
 import { NewRequestPage } from './pages/hospital/NewRequestPage';
 
 // Development only: in a production build this is null, so the gallery isn't bundled at all
@@ -35,14 +35,7 @@ export default function App() {
         <Route element={<RedirectIfAuthenticated />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register/donor" element={<RegisterDonorPage />} />
-          <Route
-            path="/register/hospital"
-            element={
-              <PublicLayout>
-                <ComingSoonPage title="Hospital registration" description="Built in the authentication branch." />
-              </PublicLayout>
-            }
-          />
+          <Route path="/register/hospital" element={<RegisterHospitalPage />} />
         </Route>
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 

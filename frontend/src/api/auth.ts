@@ -4,6 +4,7 @@ import type {
   LoginRequest,
   LoginResponse,
   RegisterDonorRequest,
+  RegisterHospitalRequest,
 } from '../types';
 import api from './client';
 
@@ -15,6 +16,12 @@ export async function login(body: LoginRequest): Promise<LoginResponse> {
 // 201 with a token: the new donor is signed in straight away
 export async function registerDonor(body: RegisterDonorRequest): Promise<LoginResponse> {
   const { data } = await api.post<LoginResponse>('/auth/register/donor', body);
+  return data;
+}
+
+// 201 with a token: the staff member is signed in, and their hospital is PENDING until an admin approves it
+export async function registerHospital(body: RegisterHospitalRequest): Promise<LoginResponse> {
+  const { data } = await api.post<LoginResponse>('/auth/register/hospital', body);
   return data;
 }
 

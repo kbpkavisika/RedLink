@@ -71,6 +71,24 @@ export interface RegisterDonorRequest {
   city: string;
 }
 
+// POST /api/auth/register/hospital. The hospital starts PENDING; the person registering becomes its
+// first HOSPITAL_STAFF user. Field errors come back as "hospital.name", "staff.email", …
+export interface RegisterHospitalRequest {
+  hospital: {
+    name: string;
+    registrationNo: string; // stored uppercased; must be unique
+    address: string;
+    city: string;
+    phone: string;
+  };
+  staff: {
+    fullName: string;
+    email: string;
+    phone: string;
+    password: string;
+  };
+}
+
 export interface ChangePasswordRequest {
   currentPassword: string; // the temporary password, if an admin set one
   newPassword: string; // 8–72 characters, different from the current one
