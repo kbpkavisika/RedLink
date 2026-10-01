@@ -60,6 +60,17 @@ export interface LoginRequest {
   rememberMe?: boolean; // true → 7-day token instead of 12 hours
 }
 
+// POST /api/auth/register/donor. No role field: this endpoint always creates a DONOR.
+export interface RegisterDonorRequest {
+  fullName: string;
+  email: string;
+  phone: string; // 10 digits starting with 0, e.g. 0771234567
+  password: string; // 8–72 characters
+  bloodGroup: BloodGroup;
+  dateOfBirth: string; // ISO date; the donor must be 18–60 today
+  city: string;
+}
+
 export interface ChangePasswordRequest {
   currentPassword: string; // the temporary password, if an admin set one
   newPassword: string; // 8–72 characters, different from the current one

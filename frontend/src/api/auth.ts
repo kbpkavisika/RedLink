@@ -1,8 +1,20 @@
-import type { ChangePasswordRequest, CurrentUser, LoginRequest, LoginResponse } from '../types';
+import type {
+  ChangePasswordRequest,
+  CurrentUser,
+  LoginRequest,
+  LoginResponse,
+  RegisterDonorRequest,
+} from '../types';
 import api from './client';
 
 export async function login(body: LoginRequest): Promise<LoginResponse> {
   const { data } = await api.post<LoginResponse>('/auth/login', body);
+  return data;
+}
+
+// 201 with a token: the new donor is signed in straight away
+export async function registerDonor(body: RegisterDonorRequest): Promise<LoginResponse> {
+  const { data } = await api.post<LoginResponse>('/auth/register/donor', body);
   return data;
 }
 

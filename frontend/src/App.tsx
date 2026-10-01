@@ -11,6 +11,7 @@ import { DonorsPage } from './pages/admin/DonorsPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { RegisterDonorPage } from './pages/RegisterDonorPage';
 import { NewRequestPage } from './pages/hospital/NewRequestPage';
 
 // Development only: in a production build this is null, so the gallery isn't bundled at all
@@ -33,14 +34,7 @@ export default function App() {
         {/* Public: signed-in users are sent to their home instead */}
         <Route element={<RedirectIfAuthenticated />}>
           <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/register/donor"
-            element={
-              <PublicLayout>
-                <ComingSoonPage title="Donor registration" description="Built in the authentication branch." />
-              </PublicLayout>
-            }
-          />
+          <Route path="/register/donor" element={<RegisterDonorPage />} />
           <Route
             path="/register/hospital"
             element={

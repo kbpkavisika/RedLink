@@ -1,6 +1,7 @@
 // Import UI building blocks from one place: import { Button, Panel } from '../components/ui';
 export { Badge, type BadgeTone } from './Badge';
 export { BloodGroupBadge } from './BloodGroupBadge';
+export { BloodGroupPicker } from './BloodGroupPicker';
 export { Button } from './Button';
 export { Chip } from './Chip';
 export { FormAlert } from './FormAlert';

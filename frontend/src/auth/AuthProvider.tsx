@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import * as authApi from '../api/auth';
 import { setUnauthorizedHandler } from '../api/client';
 import { tokenStore } from '../lib/tokenStore';
-import type { CurrentUser } from '../types';
+import type { CurrentUser, LoginResponse } from '../types';
 import { AuthContext, type AuthContextValue, type AuthStatus } from './authContext';
 
 // Dev sign-in survives a page reload for the tab's lifetime. import.meta.env.DEV is false in
@@ -78,13 +78,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setUnauthorizedHandler(null);
   }, [signOutLocally]);
 
-  const login = useCallback(async (email: string, password: string, remember: boolean) => {
-    const response = await authApi.login({ email: email.trim().toLowerCase(), password, rememberMe: remember });
+  const startSession = useCallback((response: LoginResponse, remember: boolean) => {
     tokenStore.set(response.token, remember);
     setUser(response.user);
     setStatus('authenticated');
-    return response.user;
   }, []);
+
+  const login = useCallback(
+    async (email: string, password: string, remember: boolean) => {
+      const response = await authApi.login({ email: email.trim().toLowerCase(), password, rememberMe: remember });
+      startSession(response, remember);
+      return response.user;
+    },
+    [startSession],
+  );
 
   const logout = useCallback(() => {
     tokenStore.clear();
@@ -116,11 +123,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       status,
       login,
+      startSession,
       logout,
       refreshUser,
       devSignIn: import.meta.env.DEV ? devSignIn : undefined,
     }),
-    [user, status, login, logout, refreshUser, devSignIn],
+    [user, status, login, startSession, logout, refreshUser, devSignIn],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
