@@ -613,7 +613,7 @@ RedLink/
     │   │   └── auth/                # Register, login, current user, change password
     │   ├── exception/               # ApiException types + GlobalExceptionHandler
     │   ├── security/                # SecurityConfig (role rules), JwtService, CurrentUser
-    │   ├── config/                  # redlink.* settings, admin seeder, clock
+    │   ├── config/                  # redlink.* settings, admin seeder, sample data seeder, clock
     │   ├── util/                    # Small helpers (email normalizing)
     │   └── BackendApplication.java  # Entry point
     ├── src/main/resources/
@@ -673,6 +673,10 @@ redlink.jwt.secret=PASTE_A_GENERATED_SECRET_HERE
 # Optional: creates the first admin account on the next start (you'll change the password at first sign-in)
 redlink.admin.email=admin@redlink.lk
 redlink.admin.password=CHOOSE_8_TO_72_CHARACTERS
+
+# Optional, this machine only: sample hospitals and donors for testing by hand (see "Sample data" below)
+redlink.seed.enabled=true
+redlink.seed.password=CHOOSE_8_TO_72_CHARACTERS
 ```
 
 Generate a secret with either of these:
@@ -708,6 +712,27 @@ Started BackendApplication in X seconds
 ```
 
 On the first run, Flyway creates all the tables. Look for `Successfully applied 1 migration to schema "public"`. If you set the admin settings, you'll also see `Created the first admin account: admin@redlink.lk`. **Leave this terminal open.**
+
+#### Sample data
+
+With `redlink.seed.enabled=true`, each start makes sure these accounts exist (anything already there is skipped, so there are no duplicates). They all sign in with your `redlink.seed.password` and don't have to change it.
+
+| Account | Email | Notes |
+|---|---|---|
+| Admin | `admin@seed.redlink.lk` | |
+| Staff, approved hospital | `staff.approved@seed.redlink.lk` | National Hospital Colombo (`SEED-0001`) |
+| Staff, pending hospital | `staff.pending@seed.redlink.lk` | Teaching Hospital Kandy (`SEED-0002`) |
+| Staff, rejected hospital | `staff.rejected@seed.redlink.lk` | Northern Care Hospital (`SEED-0003`), with a reason |
+| 20 donors | `firstname.lastname@seed.redlink.lk`, e.g. `kamal.perera@seed.redlink.lk` | All 8 blood groups; Colombo, Kandy, Galle, Jaffna, Kurunegala |
+
+The donors are chosen to exercise matching. Donation dates are counted back from the day you start the app, so they stay the same relative to today:
+
+- **Never donated:** Kamal Perera, Ishara Gunasekara, Priyanka Herath, Anushka Peiris and others
+- **Donated recently (not eligible):** Ruwan Silva (30 days), Chamari Rathnayake (60), Hasini Senanayake (10)
+- **The edge of the 90-day rule:** Kasun Dissanayake (89 days, not yet eligible), Sivakumar Rajan (90 days, eligible)
+- **Unavailable:** Sajith Bandara, Fathima Nazeer
+
+The full list is in [`DevDataSeeder`](backend/src/main/java/com/redlink/backend/config/DevDataSeeder.java). Never enable the seeder on a deployed server. To start again from scratch, recreate the `redLink` database (see Troubleshooting).
 
 ### 5. Start the frontend
 
@@ -866,6 +891,7 @@ cd backend
 | `CurrentUserTest` | Reading the user from the token; deleted accounts → 401, disabled → 403 | ❌ |
 | `RegistrationServiceAgeTest` | The 18–60 donor age rule at its exact edges | ❌ |
 | `AdminSeederTest` | The first admin is created once, with a hashed password it must change; bad settings refuse to start | ❌ |
+| `DevDataSeederTest` | Sample data is off unless enabled, creates every account once (no duplicates on restart), and covers every blood group and the 90-day edges | ✅ |
 | `DonorControllerTest` | Donor endpoints, their errors, and 401 / 403 for missing tokens and wrong roles (`@WebMvcTest`) | ❌ |
 | `GlobalExceptionHandlerTest` | Every error case produces the error format, and 500s don't leak internals (uses a test-only controller) | ❌ |
 | `BloodGroupTest` | Every blood group converts to its label (`A+`) and back; red cell compatibility matches the table in [Matching engine](#matching-engine) | ❌ |
@@ -1010,6 +1036,7 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Frontend foundation: design tokens, UI components, screen states, auth plumbing, role-based routing and app shell
 - [x] Authentication and roles with Spring Security + JWT
 - [x] Startup seeder for the first admin account
+- [x] Sample data for local testing (admin, hospitals, 20 donors), switched on per machine
 - [x] Donor registration and hospital registration (hospital + first staff user)
 - [x] Change own password (API)
 - [ ] Frontend sign-in, registration and change-password pages (replacing the dev sign-in)
