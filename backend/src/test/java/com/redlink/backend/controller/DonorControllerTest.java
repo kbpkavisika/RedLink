@@ -9,17 +9,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.time.LocalDate;
 import java.util.List;
 
+import static com.redlink.backend.support.TestAuth.ADMIN;
+import static com.redlink.backend.support.TestAuth.DONOR;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.mockito.BDDMockito.given;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -27,13 +26,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 // Loads only the web layer (controller + GlobalExceptionHandler + security rules); the service is mocked,
-// so no database is needed. jwt() stands in for a signed-in user with the given role.
+// so no database is needed. TestAuth.ADMIN / DONOR stand in for a signed-in user with that role.
 @WebMvcTest(DonorController.class)
 @Import(SecurityConfig.class)
 class DonorControllerTest {
-
-    private static final RequestPostProcessor ADMIN = jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
-    private static final RequestPostProcessor DONOR = jwt().authorities(new SimpleGrantedAuthority("ROLE_DONOR"));
 
     @Autowired
     private MockMvc mvc;

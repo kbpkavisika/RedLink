@@ -620,8 +620,10 @@ RedLink/
     │   ├── db/migration/                  # Flyway SQL migrations (V1__…, V2__…)
     │   ├── application.properties         # Shared config (committed)
     │   └── application-local.properties   # DB password, JWT secret, admin (git-ignored)
+    ├── src/test/java/com/redlink/backend/
+    │   └── support/                       # @IntegrationTest, TestData, TestAuth (test helpers)
     ├── src/test/resources/config/
-    │   └── application.properties         # Test-only JWT secret; admin seeder off
+    │   └── application.properties         # redLink_test database, test-only JWT secret, admin seeder off
     └── pom.xml
 ```
 
@@ -653,9 +655,10 @@ Make sure the PostgreSQL service is running. Then, in **pgAdmin**, right-click t
 
 ```sql
 CREATE DATABASE "redLink";
+CREATE DATABASE "redLink_test";
 ```
 
-The name is **case-sensitive**. Keep the double quotes, or PostgreSQL will create `redlink` instead and the backend won't find it.
+`redLink` is for the app; `redLink_test` is only used by the automated tests, so they never touch your data. The names are **case-sensitive**. Keep the double quotes, or PostgreSQL will create `redlink` instead and the backend won't find it.
 
 ### 3. Configure the backend
 
@@ -725,6 +728,7 @@ Until the sign-in form exists, open **http://localhost:5173/dev/components** and
 | Error | Cause and fix |
 |---|---|
 | `database "redLink" does not exist` | Create it (step 2) and check the exact spelling and case |
+| `database "redLink_test" does not exist` (in `./mvnw test`) | Create the test database (step 2) |
 | `password authentication failed` | Wrong password in `application-local.properties` |
 | `Connection to localhost:5432 refused` | PostgreSQL isn't running; start it in `services.msc` (Windows) |
 | `Port 8080 was already in use` | Another app is using the port; stop it or change `server.port` and the proxy target in `vite.config.ts` |
@@ -867,7 +871,30 @@ cd backend
 | `BloodGroupTest` | Every blood group converts to its label (`A+`) and back; red cell compatibility matches the table in [Matching engine](#matching-engine) | ❌ |
 | `DonorEligibilityTest` | The 90-day rule at its exact edges, and that the matching query's cutoff date agrees with it | ❌ |
 
-Tests that need PostgreSQL use your local `redLink` database. They run inside a transaction that is **rolled back**, use unique `@test.redlink.lk` emails, and keep the admin seeder switched off, so your data is never changed. Tests use their own JWT secret from `src/test/resources/config/application.properties`.
+Tests that need PostgreSQL use the separate `redLink_test` database (create it in [step 2](#2-create-the-database)), with the same user and password as the app. They run inside a transaction that is **rolled back**, use unique `@test.redlink.lk` emails, and keep the admin seeder switched off. Tests use their own JWT secret from `src/test/resources/config/application.properties`.
+
+**Writing a new test.** Pick the lightest kind that covers it:
+
+| Kind | Use for | How |
+|---|---|---|
+| Plain unit test | Rules and calculations (`DonorEligibilityTest`) | `new` the class; pass a fixed `Clock` or date |
+| Controller test | Request/response shape, validation, 401/403 | `@WebMvcTest(XController.class)` + `@Import(SecurityConfig.class)`, `@MockitoBean` the service, `.with(TestAuth.ADMIN)` |
+| Integration test | Services and queries against real PostgreSQL | `@IntegrationTest`, then inject `MockMvc` and `TestData` |
+
+```java
+@IntegrationTest
+class MatchingIntegrationTest {
+    @Autowired MockMvc mvc;
+    @Autowired TestData testData;
+
+    @Test
+    void example() throws Exception {
+        Donor donor = testData.donor(BloodGroup.O_NEG, "Kandy", null);   // never donated
+        User staff = testData.staff(testData.hospital(HospitalStatus.APPROVED));
+        mvc.perform(get("/api/...").header("Authorization", testData.bearer(staff)));
+    }
+}
+```
 
 To run only the tests that don't need a database:
 
@@ -961,7 +988,7 @@ The workflow in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on e
 
 | Job | Steps |
 |---|---|
-| **Backend (build + test)** | Starts a temporary PostgreSQL 18 database, sets up Java 25, runs `./mvnw verify` (compile + tests) |
+| **Backend (build + test)** | Starts a temporary PostgreSQL 18 database (`redLink_test`), sets up Java 25, runs `./mvnw verify` (compile + tests) |
 | **Frontend (lint + build)** | Sets up Node.js 24, runs `npm ci`, `npm run lint` and `npm run build` |
 
 Run the same checks locally before pushing:

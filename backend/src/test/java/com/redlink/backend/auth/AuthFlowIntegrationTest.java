@@ -6,18 +6,15 @@ import com.redlink.backend.model.enums.HospitalStatus;
 import com.redlink.backend.model.enums.Role;
 import com.redlink.backend.repository.DonorRepository;
 import com.redlink.backend.repository.UserRepository;
+import com.redlink.backend.support.IntegrationTest;
+import com.redlink.backend.support.TestData;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -29,26 +26,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * The real app end to end: HTTP → security → controller → service → PostgreSQL, with real JWTs.
- *
- * Each test runs in a transaction that is rolled back afterwards, so nothing is left in the database
- * (locally that is your redLink database). Emails are unique per test run, so existing data can't clash.
+ * Each test is rolled back afterwards (see @IntegrationTest).
  */
-@SpringBootTest
-@AutoConfigureMockMvc
-@Transactional
+@IntegrationTest
 class AuthFlowIntegrationTest {
 
-    private static final String PASSWORD = "Passw0rd!Test";
+    private static final String PASSWORD = TestData.PASSWORD;
 
     @Autowired private MockMvc mvc;
+    @Autowired private TestData testData;
     @Autowired private UserRepository userRepository;
     @Autowired private DonorRepository donorRepository;
-    @Autowired private PasswordEncoder passwordEncoder;
-
-    private final String run = UUID.randomUUID().toString().substring(0, 8);
 
     private String email(String name) {
-        return name + "-" + run + "@test.redlink.lk";
+        return testData.email(name);
     }
 
     private String donorJson(String email) {
@@ -77,14 +68,10 @@ class AuthFlowIntegrationTest {
         return JsonPath.read(body, "$.token");
     }
 
-    private User saveUser(String email, Role role, boolean enabled) {
-        User user = new User();
-        user.setEmail(email);
-        user.setFullName("Test " + role);
-        user.setRole(role);
+    private User saveUser(String name, Role role, boolean enabled) {
+        User user = testData.user(name, role);
         user.setEnabled(enabled);
-        user.setPasswordHash(passwordEncoder.encode(PASSWORD));
-        return userRepository.save(user);
+        return userRepository.saveAndFlush(user);
     }
 
     // ---------- Donor registration ----------
@@ -92,9 +79,9 @@ class AuthFlowIntegrationTest {
     @Test
     void registerDonorSignsInAndTidiesInput() throws Exception {
         String messy = """
-                {"fullName":"  Kamal Perera ","email":"  KAMAL-%s@Test.RedLink.LK ","phone":"077 123-4567",
+                {"fullName":"  Kamal Perera ","email":"  %s ","phone":"077 123-4567",
                  "password":"%s","bloodGroup":"AB-","dateOfBirth":"1995-04-12","city":" Colombo "}"""
-                .formatted(run, PASSWORD);
+                .formatted(email("kamal").toUpperCase(), PASSWORD);
 
         String body = postJson("/api/auth/register/donor", messy)
                 .andExpect(status().isCreated())
@@ -165,7 +152,7 @@ class AuthFlowIntegrationTest {
 
     @Test
     void registerHospitalCreatesPendingHospitalAndItsFirstStaffUser() throws Exception {
-        String registrationNo = "reg-" + run;
+        String registrationNo = testData.unique("reg");
 
         postJson("/api/auth/register/hospital", hospitalJson(registrationNo, email("dilini")))
                 .andExpect(status().isCreated())
@@ -181,7 +168,7 @@ class AuthFlowIntegrationTest {
 
     @Test
     void duplicateRegistrationNumberIs409AndCreatesNoUser() throws Exception {
-        String registrationNo = "REG-" + run;
+        String registrationNo = testData.unique("REG");
         postJson("/api/auth/register/hospital", hospitalJson(registrationNo, email("first")))
                 .andExpect(status().isCreated());
 
@@ -206,7 +193,7 @@ class AuthFlowIntegrationTest {
 
     @Test
     void loginReturnsAWorkingTokenAndTheUser() throws Exception {
-        saveUser(email("admin"), Role.ADMIN, true);
+        saveUser("admin",Role.ADMIN, true);
 
         String body = postJson("/api/auth/login", """
                 {"email":"  %s ","password":"%s"}""".formatted(email("admin").toUpperCase(), PASSWORD))
@@ -223,7 +210,7 @@ class AuthFlowIntegrationTest {
 
     @Test
     void tokenLasts12HoursOr7DaysWithRememberMe() throws Exception {
-        saveUser(email("kamal"), Role.DONOR, true);
+        saveUser("kamal",Role.DONOR, true);
         String login = """
                 {"email":"%s","password":"%s","rememberMe":%s}""";
 
@@ -240,7 +227,7 @@ class AuthFlowIntegrationTest {
 
     @Test
     void wrongPasswordAndUnknownEmailGetTheSameAnswer() throws Exception {
-        saveUser(email("kamal"), Role.DONOR, true);
+        saveUser("kamal",Role.DONOR, true);
 
         for (String email : new String[]{email("kamal"), email("nobody")}) {
             postJson("/api/auth/login", """
@@ -252,7 +239,7 @@ class AuthFlowIntegrationTest {
 
     @Test
     void disabledAccountIsOnlyRevealedWithTheRightPassword() throws Exception {
-        saveUser(email("blocked"), Role.DONOR, false);
+        saveUser("blocked",Role.DONOR, false);
         String login = """
                 {"email":"%s","password":"%s"}""";
 
@@ -275,7 +262,7 @@ class AuthFlowIntegrationTest {
 
     @Test
     void changePasswordFlow() throws Exception {
-        User user = saveUser(email("admin"), Role.ADMIN, true);
+        User user = saveUser("admin",Role.ADMIN, true);
         user.setMustChangePassword(true);
         String token = login(email("admin"), PASSWORD);
         String change = """
@@ -306,8 +293,8 @@ class AuthFlowIntegrationTest {
 
     @Test
     void rolesDecideWhatATokenCanReach() throws Exception {
-        saveUser(email("admin"), Role.ADMIN, true);
-        saveUser(email("donor"), Role.DONOR, true);
+        saveUser("admin",Role.ADMIN, true);
+        saveUser("donor",Role.DONOR, true);
 
         mvc.perform(get("/api/donors").header("Authorization", "Bearer " + login(email("admin"), PASSWORD)))
                 .andExpect(status().isOk());
@@ -320,7 +307,7 @@ class AuthFlowIntegrationTest {
     void protectedEndpointsNeedAValidToken() throws Exception {
         mvc.perform(get("/api/auth/me")).andExpect(status().isUnauthorized());
 
-        saveUser(email("donor"), Role.DONOR, true);
+        saveUser("donor",Role.DONOR, true);
         String token = login(email("donor"), PASSWORD);
         String tampered = token.substring(0, token.length() - 4) + "AAAA";
         mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + tampered))
@@ -330,7 +317,7 @@ class AuthFlowIntegrationTest {
 
     @Test
     void disablingAnAccountStopsItsExistingToken() throws Exception {
-        User user = saveUser(email("donor"), Role.DONOR, true);
+        User user = saveUser("donor",Role.DONOR, true);
         String token = login(email("donor"), PASSWORD);
 
         user.setEnabled(false);
