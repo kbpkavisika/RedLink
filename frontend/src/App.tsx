@@ -5,6 +5,7 @@ import { RequireAuth } from './auth/RequireAuth';
 import { RoleRedirect } from './auth/RoleRedirect';
 import { AppShell } from './components/layout/AppShell';
 import { PublicLayout } from './components/layout/PublicLayout';
+import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
 import { DonorsPage } from './pages/admin/DonorsPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
@@ -54,10 +55,7 @@ export default function App() {
         {/* Signed in: every page below shares the app shell */}
         <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>
-            <Route
-              path="/change-password"
-              element={<ComingSoonPage title="Change password" description="Built in the authentication branch." />}
-            />
+            <Route path="/change-password" element={<ChangePasswordPage />} />
 
             <Route element={<RequireAuth role="HOSPITAL_STAFF" />}>
               <Route

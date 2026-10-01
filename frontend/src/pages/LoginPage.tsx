@@ -1,17 +1,17 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Building2, ChevronRight, Droplet, Eye, EyeOff, type LucideIcon } from 'lucide-react';
+import { Building2, ChevronRight, Droplet, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '../auth/useAuth';
 import { AuthLayout } from '../components/layout/AuthLayout';
-import { Button, Input } from '../components/ui';
+import { Button, FormAlert, Input, PasswordInput } from '../components/ui';
 import { applyFieldErrors } from '../lib/formErrors';
 import type { ApiError } from '../types';
 
 const schema = z.object({
-  email: z.string().trim().min(1, 'Enter your email').email('Enter a valid email, e.g. name@example.lk'),
+  email: z.string().trim().min(1, 'Enter your email').pipe(z.email('Enter a valid email, e.g. name@example.lk')),
   password: z.string().min(1, 'Enter your password'),
   remember: z.boolean(),
 });
@@ -24,7 +24,6 @@ type LoginForm = z.infer<typeof schema>;
  */
 export function LoginPage() {
   const { login } = useAuth();
-  const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
@@ -58,11 +57,7 @@ export function LoginPage() {
       </div>
 
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
-        {formError && (
-          <p role="alert" className="rounded-lg bg-primary-subtle px-4 py-3 text-label text-primary-hover">
-            {formError}
-          </p>
-        )}
+        <FormAlert>{formError}</FormAlert>
 
         <Input
           label="Email"
@@ -73,23 +68,11 @@ export function LoginPage() {
           {...register('email')}
         />
 
-        <Input
+        <PasswordInput
           label="Password"
-          type={showPassword ? 'text' : 'password'}
           autoComplete="current-password"
           error={errors.password?.message}
           labelAction={<Link to="/forgot-password">Forgot password?</Link>}
-          rightSlot={
-            <Button
-              variant="icon"
-              size="sm"
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              aria-pressed={showPassword}
-              onClick={() => setShowPassword((shown) => !shown)}
-            >
-              {showPassword ? <EyeOff size={18} strokeWidth={1.75} /> : <Eye size={18} strokeWidth={1.75} />}
-            </Button>
-          }
           {...register('password')}
         />
 

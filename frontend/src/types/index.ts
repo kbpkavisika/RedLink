@@ -60,6 +60,11 @@ export interface LoginRequest {
   rememberMe?: boolean; // true → 7-day token instead of 12 hours
 }
 
+export interface ChangePasswordRequest {
+  currentPassword: string; // the temporary password, if an admin set one
+  newPassword: string; // 8–72 characters, different from the current one
+}
+
 export interface LoginResponse {
   token: string;
   expiresAt: string; // ISO timestamp
