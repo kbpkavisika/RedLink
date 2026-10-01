@@ -864,14 +864,15 @@ cd backend
 | `AdminSeederTest` | The first admin is created once, with a hashed password it must change; bad settings refuse to start | ❌ |
 | `DonorControllerTest` | Donor endpoints, their errors, and 401 / 403 for missing tokens and wrong roles (`@WebMvcTest`) | ❌ |
 | `GlobalExceptionHandlerTest` | Every error case produces the error format, and 500s don't leak internals (uses a test-only controller) | ❌ |
-| `BloodGroupTest` | Every blood group converts to its label (`A+`) and back | ❌ |
+| `BloodGroupTest` | Every blood group converts to its label (`A+`) and back; red cell compatibility matches the table in [Matching engine](#matching-engine) | ❌ |
+| `DonorEligibilityTest` | The 90-day rule at its exact edges, and that the matching query's cutoff date agrees with it | ❌ |
 
 Tests that need PostgreSQL use your local `redLink` database. They run inside a transaction that is **rolled back**, use unique `@test.redlink.lk` emails, and keep the admin seeder switched off, so your data is never changed. Tests use their own JWT secret from `src/test/resources/config/application.properties`.
 
 To run only the tests that don't need a database:
 
 ```bash
-./mvnw test -Dtest="JwtServiceTest,CurrentUserTest,RegistrationServiceAgeTest,AdminSeederTest,DonorControllerTest,GlobalExceptionHandlerTest,BloodGroupTest"
+./mvnw test -Dtest="JwtServiceTest,CurrentUserTest,RegistrationServiceAgeTest,AdminSeederTest,DonorControllerTest,GlobalExceptionHandlerTest,BloodGroupTest,DonorEligibilityTest"
 ```
 
 ### Planned endpoints
