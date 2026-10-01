@@ -100,12 +100,6 @@ export function LoginPage() {
           description="Needs admin approval"
         />
       </div>
-
-      {import.meta.env.DEV && (
-        <p className="rounded-lg border border-dashed border-border-strong px-4 py-3 text-label text-text-muted">
-          Development: <Link to="/dev/components">sign in as a test user</Link> in the component gallery.
-        </p>
-      )}
     </AuthLayout>
   );
 }
