@@ -302,9 +302,11 @@ Authorization: Bearer <token>
 | `POST /api/auth/login`, `POST /api/auth/register/**` | Anyone |
 | `/api/admin/**`, `/api/donors/**` | `ADMIN` |
 | `/api/donor/**` | `DONOR` |
+| `POST /api/requests/{id}/responses`, `PATCH /api/requests/{id}/responses/me` | `DONOR` |
+| `/api/requests/**` (everything else) | `HOSPITAL_STAFF` |
 | Everything else | Any signed-in user |
 
-Areas shared by several roles, such as `/api/requests` (staff create requests, donors respond), use `@PreAuthorize` on each controller method instead. **Hospital approval is not a role:** a staff member of a `PENDING` hospital is signed in, and the service refuses to post with a 403.
+`/api/requests` is shared: staff create and manage requests, donors respond to them. That's why the two donor endpoints are listed before the staff rule. **Hospital approval is not a role:** a staff member of a `PENDING` hospital is signed in, and the service refuses to post with a 403.
 
 **Security details**
 
@@ -892,6 +894,7 @@ cd backend
 | `AuthFlowIntegrationTest` | Registration, login, `/me`, password change and role rules through the whole app with real tokens | ✅ |
 | `RegistrationRollbackTest` | A failure halfway through hospital registration leaves nothing in the database | ✅ |
 | `JwtServiceTest` | Token contents and lifetime; expired, forged and wrong-issuer tokens are rejected; BCrypt hashing | ❌ |
+| `SecurityRulesTest` | The role rules for `/api/requests`: staff manage requests, donors respond, everyone else gets 403 | ❌ |
 | `CurrentUserTest` | Reading the user from the token; deleted accounts → 401, disabled → 403 | ❌ |
 | `RegistrationServiceAgeTest` | The 18–60 donor age rule at its exact edges | ❌ |
 | `AdminSeederTest` | The first admin is created once, with a hashed password it must change; bad settings refuse to start | ❌ |
@@ -929,7 +932,7 @@ class MatchingIntegrationTest {
 To run only the tests that don't need a database:
 
 ```bash
-./mvnw test -Dtest="JwtServiceTest,CurrentUserTest,RegistrationServiceAgeTest,AdminSeederTest,DonorControllerTest,GlobalExceptionHandlerTest,BloodGroupTest,DonorEligibilityTest"
+./mvnw test -Dtest="JwtServiceTest,CurrentUserTest,RegistrationServiceAgeTest,AdminSeederTest,DonorControllerTest,GlobalExceptionHandlerTest,BloodGroupTest,DonorEligibilityTest,SecurityRulesTest"
 ```
 
 ### Planned endpoints
