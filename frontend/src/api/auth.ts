@@ -1,8 +1,6 @@
 import type { CurrentUser, LoginRequest, LoginResponse } from '../types';
 import api from './client';
 
-// Planned backend endpoints (feature/auth-jwt). Until they exist, these fail and the user stays signed out.
-
 export async function login(body: LoginRequest): Promise<LoginResponse> {
   const { data } = await api.post<LoginResponse>('/auth/login', body);
   return data;

@@ -57,6 +57,7 @@ export interface CurrentUser {
 export interface LoginRequest {
   email: string;
   password: string;
+  rememberMe?: boolean; // true → 7-day token instead of 12 hours
 }
 
 export interface LoginResponse {

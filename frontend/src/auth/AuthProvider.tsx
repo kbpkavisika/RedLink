@@ -79,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [signOutLocally]);
 
   const login = useCallback(async (email: string, password: string, remember: boolean) => {
-    const response = await authApi.login({ email: email.trim().toLowerCase(), password });
+    const response = await authApi.login({ email: email.trim().toLowerCase(), password, rememberMe: remember });
     tokenStore.set(response.token, remember);
     setUser(response.user);
     setStatus('authenticated');
