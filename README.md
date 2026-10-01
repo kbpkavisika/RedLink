@@ -583,6 +583,7 @@ All 7 tables are created by **Flyway** from SQL files in `backend/src/main/resou
 ```
 RedLink/
 ├── .github/workflows/ci.yml         # CI pipeline (GitHub Actions)
+├── postman/                         # Postman collection + local environment (see Testing the API)
 │
 ├── frontend/                        # React + TypeScript (Vite)
 │   ├── src/
@@ -851,11 +852,14 @@ For hospital staff, `user` also has `hospitalId` and `hospitalStatus` (`PENDING`
 
 ### Option 2: Postman
 
-1. **POST** `{{baseUrl}}/auth/login` with **Body → raw → JSON** `{"email":"…","password":"…"}`.
-2. In that request's **Scripts → Post-response** tab, save the token: `pm.environment.set("token", pm.response.json().token);`
-3. For every other request, set **Authorization → Bearer Token** to `{{token}}`.
+The repo includes a ready-made collection in [`postman/`](postman/):
 
-Create a Postman **environment** with `baseUrl = http://localhost:8080/api`. Switching to the deployed API later then only needs a different environment.
+1. In Postman, choose **Import** and select both files in `postman/`: `RedLink.postman_collection.json` and `RedLink-Local.postman_environment.json`.
+2. Select the **RedLink Local** environment (top right) and set `seedPassword` to your `redlink.seed.password` (see [Sample data](#sample-data)).
+3. Run a request in **1. Sign in** (admin, approved staff, pending staff or donor). Its script saves the token, and every other request sends it automatically.
+4. Run anything in **2. Auth** or **3. Donors (admin)**. To act as someone else, run another sign-in request.
+
+The registration requests use `{{$timestamp}}`, so each run creates a new account and signs in as it. To use the deployed API later, duplicate the environment and change `baseUrl`. When you add an endpoint, add it to the collection too (export it from Postman over the file in `postman/`).
 
 ### Option 3: Through the frontend
 
