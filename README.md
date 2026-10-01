@@ -389,16 +389,16 @@ Every data view shows one of six states, all from `StateView`:
 | Path | Who |
 |---|---|
 | `/login`, `/register/donor`, `/register/hospital`, `/forgot-password` | Public (signed-in users are sent home) |
-| `/hospital`, `/hospital/requests`, `/hospital/requests/new`, `/hospital/requests/:id` | Hospital staff |
+| `/hospital`, `/hospital/requests`, `/hospital/requests/new`, `/hospital/requests/:id` | Hospital staff (approved hospital; others see its approval progress) |
 | `/donor`, `/donor/requests`, `/donor/history`, `/donor/profile` | Donors |
 | `/admin/hospitals`, `/admin/users`, `/admin/requests`, `/admin/donors` | Admins |
 | `/change-password` | Any signed-in user |
 
-`/` sends each user to their home. `RequireAuth` sends signed-out users to `/login?from=…`, users with a temporary password to `/change-password`, and users on another role's page back to their own home. This is for convenience only: the backend's 401 and 403 are the real protection. Pages not built yet show a "coming soon" placeholder.
+`/` sends each user to their home. `RequireAuth` sends signed-out users to `/login?from=…`, users with a temporary password to `/change-password`, and users on another role's page back to their own home. After signing in, users return to the `from` page (only paths on this site are accepted). `HospitalApprovalGate` shows staff of a pending or rejected hospital the approval progress, with the admin's reason if rejected, and re-checks the status when they open a hospital page or press **Check again**. This is for convenience only: the backend's 401 and 403 are the real protection. Pages not built yet show a "coming soon" placeholder.
 
 ### Development tools
 
-With `npm run dev`, **http://localhost:5173/dev/components** shows every component and screen state and lets you **sign in as a test user** (admin, hospital staff approved / pending / rejected, donor, donor with a temporary password) before the real login exists. The gallery and the test sign-in are left out of production builds.
+With `npm run dev`, **http://localhost:5173/dev/components** shows every component and screen state. It is left out of production builds. To try the app as each role (admin, approved / pending / rejected hospital staff, donors), turn on the [sample data](#sample-data) and sign in with those accounts.
 
 ### Adding a page
 
@@ -749,7 +749,7 @@ npm run dev
 
 Open **http://localhost:5173**. Requests to `/api/*` are forwarded to the backend on port 8080.
 
-Until the sign-in form exists, open **http://localhost:5173/dev/components** and pick a test user to explore the app (see [Development tools](#development-tools)).
+Sign in at **http://localhost:5173/login**, or register as a donor or a hospital. With the [sample data](#sample-data) turned on, you can sign in as any role straight away.
 
 ### Troubleshooting
 
@@ -782,7 +782,7 @@ Start the backend first (step 4). All endpoints are under `http://localhost:8080
 | `POST` | `/api/auth/register/donor` | Anyone | Create a donor account (user + donor profile); returns `201` with a token |
 | `POST` | `/api/auth/register/hospital` | Anyone | Register a hospital (`PENDING`) and its first staff user; returns `201` with a token |
 | `POST` | `/api/auth/login` | Anyone | Email + password (+ optional `rememberMe`) → token |
-| `GET` | `/api/auth/me` | Signed in | The current user, including `hospitalStatus` for staff |
+| `GET` | `/api/auth/me` | Signed in | The current user. For staff, also `hospitalName`, `hospitalStatus` and, if rejected, `hospitalRejectionReason` |
 | `PATCH` | `/api/auth/me/password` | Signed in | Change own password (`currentPassword`, `newPassword`) |
 | `GET` | `/api/donors` | Admin | List all donors |
 | `GET` | `/api/donors/{id}` | Admin | One donor; `404` in the [error format](#error-format) if the ID doesn't exist |
@@ -867,7 +867,7 @@ The registration requests use `{{$timestamp}}`, so each run creates a new accoun
 
 With both servers running, **http://localhost:5173/api/...** reaches the backend through the Vite proxy.
 
-The frontend's sign-in page isn't built yet, so the **dev sign-in** at `/dev/components` has no real token. Pages that call protected endpoints, such as `/admin/donors`, show the **error state** ("You're not signed in…") until the sign-in page arrives. That is expected.
+Sign in at `/login` first. The browser then sends your token with every `/api` request, so protected pages such as `/admin/donors` load real data.
 
 ### Check the data in the database
 
@@ -1046,7 +1046,7 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Sample data for local testing (admin, hospitals, 20 donors), switched on per machine
 - [x] Donor registration and hospital registration (hospital + first staff user)
 - [x] Change own password (API)
-- [ ] Frontend sign-in, registration and change-password pages (replacing the dev sign-in)
+- [x] Frontend sign-in, registration and change-password pages, and the hospital approval screen
 - [ ] Admin approval of hospitals, with rejection reason
 - [ ] Admin user management: add staff users, set temporary passwords
 - [ ] Blood requests and the matching engine

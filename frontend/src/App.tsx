@@ -1,15 +1,18 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HospitalApprovalGate } from './auth/HospitalApprovalGate';
 import { RedirectIfAuthenticated } from './auth/RedirectIfAuthenticated';
 import { RequireAuth } from './auth/RequireAuth';
 import { RoleRedirect } from './auth/RoleRedirect';
 import { AppShell } from './components/layout/AppShell';
-import { PublicLayout } from './components/layout/PublicLayout';
+import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
 import { DonorsPage } from './pages/admin/DonorsPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { RegisterDonorPage } from './pages/RegisterDonorPage';
+import { RegisterHospitalPage } from './pages/RegisterHospitalPage';
 import { NewRequestPage } from './pages/hospital/NewRequestPage';
 
 // Development only: in a production build this is null, so the gallery isn't bundled at all
@@ -32,47 +35,33 @@ export default function App() {
         {/* Public: signed-in users are sent to their home instead */}
         <Route element={<RedirectIfAuthenticated />}>
           <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/register/donor"
-            element={
-              <PublicLayout>
-                <ComingSoonPage title="Donor registration" description="Built in the authentication branch." />
-              </PublicLayout>
-            }
-          />
-          <Route
-            path="/register/hospital"
-            element={
-              <PublicLayout>
-                <ComingSoonPage title="Hospital registration" description="Built in the authentication branch." />
-              </PublicLayout>
-            }
-          />
+          <Route path="/register/donor" element={<RegisterDonorPage />} />
+          <Route path="/register/hospital" element={<RegisterHospitalPage />} />
         </Route>
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
         {/* Signed in: every page below shares the app shell */}
         <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>
-            <Route
-              path="/change-password"
-              element={<ComingSoonPage title="Change password" description="Built in the authentication branch." />}
-            />
+            <Route path="/change-password" element={<ChangePasswordPage />} />
 
             <Route element={<RequireAuth role="HOSPITAL_STAFF" />}>
-              <Route
-                path="/hospital"
-                element={<ComingSoonPage title="Your dashboard" description="Open requests and responses at a glance." />}
-              />
-              <Route
-                path="/hospital/requests"
-                element={<ComingSoonPage title="Requests" description="Every request your hospital has posted." />}
-              />
-              <Route path="/hospital/requests/new" element={<NewRequestPage />} />
-              <Route
-                path="/hospital/requests/:id"
-                element={<ComingSoonPage title="Request detail" description="Matched donors and their responses." />}
-              />
+              {/* Until the hospital is approved, every page below shows its approval progress instead */}
+              <Route element={<HospitalApprovalGate />}>
+                <Route
+                  path="/hospital"
+                  element={<ComingSoonPage title="Your dashboard" description="Open requests and responses at a glance." />}
+                />
+                <Route
+                  path="/hospital/requests"
+                  element={<ComingSoonPage title="Requests" description="Every request your hospital has posted." />}
+                />
+                <Route path="/hospital/requests/new" element={<NewRequestPage />} />
+                <Route
+                  path="/hospital/requests/:id"
+                  element={<ComingSoonPage title="Request detail" description="Matched donors and their responses." />}
+                />
+              </Route>
             </Route>
 
             <Route element={<RequireAuth role="DONOR" />}>

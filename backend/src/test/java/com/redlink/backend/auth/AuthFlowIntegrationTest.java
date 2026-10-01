@@ -159,11 +159,23 @@ class AuthFlowIntegrationTest {
                 .andExpect(jsonPath("$.token").isNotEmpty())
                 .andExpect(jsonPath("$.user.role").value("HOSPITAL_STAFF"))
                 .andExpect(jsonPath("$.user.hospitalStatus").value("PENDING"))
-                .andExpect(jsonPath("$.user.hospitalId").isNumber());
+                .andExpect(jsonPath("$.user.hospitalId").isNumber())
+                .andExpect(jsonPath("$.user.hospitalName").value("Nawaloka Hospital"))
+                .andExpect(jsonPath("$.user.hospitalRejectionReason").doesNotExist());
 
         User staff = userRepository.findByEmail(email("dilini")).orElseThrow();
         assertThat(staff.getHospital().getRegistrationNo()).isEqualTo(registrationNo.toUpperCase());
         assertThat(staff.getHospital().getStatus()).isEqualTo(HospitalStatus.PENDING);
+    }
+
+    @Test
+    void staffOfARejectedHospitalSeeTheReasonInMe() throws Exception {
+        User staff = testData.staff(testData.hospital(HospitalStatus.REJECTED));
+
+        mvc.perform(get("/api/auth/me").header("Authorization", testData.bearer(staff)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hospitalStatus").value("REJECTED"))
+                .andExpect(jsonPath("$.hospitalRejectionReason").value("Registration number could not be verified."));
     }
 
     @Test

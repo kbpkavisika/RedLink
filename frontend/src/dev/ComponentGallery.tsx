@@ -1,7 +1,6 @@
 import { Eye, EyeOff, Plus, SlidersHorizontal } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/useAuth';
+import { Link } from 'react-router-dom';
 import {
   Badge,
   BloodGroupBadge,
@@ -17,11 +16,9 @@ import {
   UrgencyTag,
   type Column,
 } from '../components/ui';
-import { homePathFor, roleLabel } from '../lib/roles';
 import { BLOOD_GROUPS, type ApiError, type DonorSummary } from '../types';
-import { devUsers } from './devUsers';
 
-// Development only (/dev/components): every component and screen state, plus a sign-in as any test user.
+// Development only (/dev/components): every component and screen state.
 // The route and this file are left out of production builds.
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -80,8 +77,6 @@ const sampleError: ApiError = {
 };
 
 export default function ComponentGallery() {
-  const { user, devSignIn, logout } = useAuth();
-  const navigate = useNavigate();
   const [available, setAvailable] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [chips, setChips] = useState(['Group: AB−', 'City: Jaffna']);
@@ -92,48 +87,10 @@ export default function ComponentGallery() {
         <p className="text-eyebrow text-primary uppercase">Development only</p>
         <h1 className="font-display text-display-lg text-ink">Component gallery</h1>
         <p className="max-w-[560px] text-body text-text-muted">
-          Every UI building block and screen state from design.md, and a sign-in as any test user so the app shell
-          and route guards can be tried before the real login exists.
+          Every UI building block and screen state from design.md. To try the app as each role, sign in with the
+          sample accounts (see "Sample data" in the README).
         </p>
       </header>
-
-      <Section title="Sign in as a test user">
-        <Panel padded>
-          <div className="flex flex-col gap-4">
-            <p className="text-body text-text-muted">
-              {user ? (
-                <>
-                  Signed in as <strong className="text-ink">{user.fullName}</strong> ({roleLabel(user.role)}).{' '}
-                  <Link to="/">Open the app</Link>
-                </>
-              ) : (
-                'Not signed in. Pick a user: you go straight to their home page.'
-              )}
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {devUsers.map(({ label, note, user: devUser }) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => {
-                    devSignIn?.(devUser);
-                    navigate(homePathFor(devUser.role));
-                  }}
-                  className="flex flex-col items-start gap-1 rounded-xl border border-border-strong bg-surface p-3.5 text-left hover:bg-bg focus-visible:shadow-focus focus-visible:outline-none"
-                >
-                  <span className="text-body font-semibold text-ink">{label}</span>
-                  <span className="text-caption text-text-subtle">{note}</span>
-                </button>
-              ))}
-            </div>
-            {user && (
-              <Button variant="outline" size="sm" className="self-start" onClick={logout}>
-                Sign out
-              </Button>
-            )}
-          </div>
-        </Panel>
-      </Section>
 
       <Section title="Colours">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
