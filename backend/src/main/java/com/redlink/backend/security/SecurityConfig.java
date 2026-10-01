@@ -39,8 +39,8 @@ import java.util.List;
  *   read "Authorization: Bearer <token>" → verify signature, expiry and issuer (bad → 401)
  *   → read the role from the token → check the URL rules below (not allowed → 403)
  *
- * Rules are checked top to bottom; the first match wins. Areas shared by several roles
- * (e.g. /api/requests: staff create, donors respond) use @PreAuthorize on the controller method instead.
+ * Rules are checked top to bottom; the first match wins. /api/requests is shared: staff create and
+ * manage requests, donors respond, so the donor endpoints are listed before the staff catch-all.
  * Hospital approval is not a role: services check it and throw ForbiddenException.
  */
 @Configuration
@@ -69,6 +69,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/donor/**").hasRole("DONOR")
                         .requestMatchers("/api/donors/**").hasRole("ADMIN")
+                        // Donors answer a request under /api/requests/{id}/responses; checked before the
+                        // hospital rule below because the first matching rule wins
+                        .requestMatchers(HttpMethod.POST, "/api/requests/*/responses").hasRole("DONOR")
+                        .requestMatchers(HttpMethod.PATCH, "/api/requests/*/responses/me").hasRole("DONOR")
+                        .requestMatchers("/api/requests/**").hasRole("HOSPITAL_STAFF")
                         // Everything else needs a signed-in user of any role
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(resourceServer -> resourceServer

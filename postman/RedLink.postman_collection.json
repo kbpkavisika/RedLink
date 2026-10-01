@@ -1,0 +1,237 @@
+{
+  "info": {
+    "name": "RedLink API",
+    "description": "Every RedLink endpoint. Start with **1. Sign in**: each login request saves its token in the `token` collection variable, and every other request sends it as `Authorization: Bearer {{token}}` (set once on the collection). Signing in as another user replaces the token.\n\nThe sign-in requests use the sample accounts from the backend's sample data (`redlink.seed.enabled=true`) and the `seedPassword` variable. Set it in the **RedLink Local** environment (postman/RedLink-Local.postman_environment.json) to your `redlink.seed.password`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{token}}", "type": "string" }
+    ]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api", "description": "Overridden by the environment's baseUrl when one is selected" },
+    { "key": "token", "value": "", "description": "Set by the sign-in and registration requests" },
+    { "key": "donorId", "value": "1", "description": "Set by List donors (first donor in the list)" }
+  ],
+  "item": [
+    {
+      "name": "1. Sign in",
+      "description": "Run one of these first. The token is saved automatically and used by every other request.",
+      "item": [
+        {
+          "name": "Login as admin",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Signed in\", () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set(\"token\", body.token);",
+              "console.log(`Signed in as ${body.user.email} (${body.user.role}). Token saved.`);"
+            ] } }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@seed.redlink.lk\",\n  \"password\": \"{{seedPassword}}\",\n  \"rememberMe\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Login as hospital staff (approved)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Signed in\", () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set(\"token\", body.token);",
+              "console.log(`Signed in as ${body.user.email} (${body.user.role}, hospital ${body.user.hospitalStatus}). Token saved.`);"
+            ] } }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"staff.approved@seed.redlink.lk\",\n  \"password\": \"{{seedPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Login as hospital staff (pending)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Signed in\", () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set(\"token\", body.token);",
+              "console.log(`Signed in as ${body.user.email} (${body.user.role}, hospital ${body.user.hospitalStatus}). Token saved.`);"
+            ] } }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"staff.pending@seed.redlink.lk\",\n  \"password\": \"{{seedPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Login as donor",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Signed in\", () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set(\"token\", body.token);",
+              "console.log(`Signed in as ${body.user.email} (${body.user.role}). Token saved.`);"
+            ] } }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"kamal.perera@seed.redlink.lk\",\n  \"password\": \"{{seedPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Auth",
+      "item": [
+        {
+          "name": "Current user (me)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ] } }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth", "me"] }
+          }
+        },
+        {
+          "name": "Change own password",
+          "request": {
+            "description": "Changes the password of whoever is signed in. For a sample account, this replaces redlink.seed.password for that user only.",
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{seedPassword}}\",\n  \"newPassword\": \"CHOOSE_A_NEW_PASSWORD\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/me/password", "host": ["{{baseUrl}}"], "path": ["auth", "me", "password"] }
+          }
+        },
+        {
+          "name": "Register donor",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Created\", () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set(\"token\", body.token);",
+              "console.log(`Registered and signed in as ${body.user.email}. Token saved.`);"
+            ] } }
+          ],
+          "request": {
+            "description": "Uses {{$timestamp}} so the email is new every time.",
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Postman Donor\",\n  \"email\": \"donor-{{$timestamp}}@example.lk\",\n  \"phone\": \"0771234567\",\n  \"password\": \"Passw0rd!Test\",\n  \"bloodGroup\": \"O+\",\n  \"dateOfBirth\": \"1995-04-12\",\n  \"city\": \"Colombo\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register/donor", "host": ["{{baseUrl}}"], "path": ["auth", "register", "donor"] }
+          }
+        },
+        {
+          "name": "Register hospital",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Created\", () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set(\"token\", body.token);",
+              "console.log(`Registered and signed in as ${body.user.email} (hospital ${body.user.hospitalStatus}). Token saved.`);"
+            ] } }
+          ],
+          "request": {
+            "description": "Creates a PENDING hospital and its first staff user. Uses {{$timestamp}} so the registration number and email are new every time.",
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hospital\": {\n    \"name\": \"Postman Hospital\",\n    \"registrationNo\": \"REG-{{$timestamp}}\",\n    \"address\": \"1 Test Rd\",\n    \"city\": \"Colombo\",\n    \"phone\": \"0115577111\"\n  },\n  \"staff\": {\n    \"fullName\": \"Postman Staff\",\n    \"email\": \"staff-{{$timestamp}}@example.lk\",\n    \"phone\": \"0712345678\",\n    \"password\": \"Passw0rd!Test\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register/hospital", "host": ["{{baseUrl}}"], "path": ["auth", "register", "hospital"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Donors (admin)",
+      "description": "Sign in as admin first; other roles get 403.",
+      "item": [
+        {
+          "name": "List donors",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "const donors = pm.response.json();",
+              "if (donors.length > 0) {",
+              "  pm.collectionVariables.set(\"donorId\", donors[0].id);",
+              "}"
+            ] } }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/donors", "host": ["{{baseUrl}}"], "path": ["donors"] }
+          }
+        },
+        {
+          "name": "Get donor by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/donors/{{donorId}}", "host": ["{{baseUrl}}"], "path": ["donors", "{{donorId}}"] }
+          }
+        },
+        {
+          "name": "List donors without a token (401)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+            ] } }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/donors", "host": ["{{baseUrl}}"], "path": ["donors"] }
+          }
+        }
+      ]
+    }
+  ]
+}

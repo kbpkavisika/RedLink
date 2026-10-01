@@ -302,9 +302,11 @@ Authorization: Bearer <token>
 | `POST /api/auth/login`, `POST /api/auth/register/**` | Anyone |
 | `/api/admin/**`, `/api/donors/**` | `ADMIN` |
 | `/api/donor/**` | `DONOR` |
+| `POST /api/requests/{id}/responses`, `PATCH /api/requests/{id}/responses/me` | `DONOR` |
+| `/api/requests/**` (everything else) | `HOSPITAL_STAFF` |
 | Everything else | Any signed-in user |
 
-Areas shared by several roles, such as `/api/requests` (staff create requests, donors respond), use `@PreAuthorize` on each controller method instead. **Hospital approval is not a role:** a staff member of a `PENDING` hospital is signed in, and the service refuses to post with a 403.
+`/api/requests` is shared: staff create and manage requests, donors respond to them. That's why the two donor endpoints are listed before the staff rule. **Hospital approval is not a role:** a staff member of a `PENDING` hospital is signed in, and the service refuses to post with a 403.
 
 **Security details**
 
@@ -583,6 +585,7 @@ All 7 tables are created by **Flyway** from SQL files in `backend/src/main/resou
 ```
 RedLink/
 ├── .github/workflows/ci.yml         # CI pipeline (GitHub Actions)
+├── postman/                         # Postman collection + local environment (see Testing the API)
 │
 ├── frontend/                        # React + TypeScript (Vite)
 │   ├── src/
@@ -613,15 +616,17 @@ RedLink/
     │   │   └── auth/                # Register, login, current user, change password
     │   ├── exception/               # ApiException types + GlobalExceptionHandler
     │   ├── security/                # SecurityConfig (role rules), JwtService, CurrentUser
-    │   ├── config/                  # redlink.* settings, admin seeder, clock
+    │   ├── config/                  # redlink.* settings, admin seeder, sample data seeder, clock
     │   ├── util/                    # Small helpers (email normalizing)
     │   └── BackendApplication.java  # Entry point
     ├── src/main/resources/
     │   ├── db/migration/                  # Flyway SQL migrations (V1__…, V2__…)
     │   ├── application.properties         # Shared config (committed)
     │   └── application-local.properties   # DB password, JWT secret, admin (git-ignored)
+    ├── src/test/java/com/redlink/backend/
+    │   └── support/                       # @IntegrationTest, TestData, TestAuth (test helpers)
     ├── src/test/resources/config/
-    │   └── application.properties         # Test-only JWT secret; admin seeder off
+    │   └── application.properties         # redLink_test database, test-only JWT secret, admin seeder off
     └── pom.xml
 ```
 
@@ -653,9 +658,10 @@ Make sure the PostgreSQL service is running. Then, in **pgAdmin**, right-click t
 
 ```sql
 CREATE DATABASE "redLink";
+CREATE DATABASE "redLink_test";
 ```
 
-The name is **case-sensitive**. Keep the double quotes, or PostgreSQL will create `redlink` instead and the backend won't find it.
+`redLink` is for the app; `redLink_test` is only used by the automated tests, so they never touch your data. The names are **case-sensitive**. Keep the double quotes, or PostgreSQL will create `redlink` instead and the backend won't find it.
 
 ### 3. Configure the backend
 
@@ -670,6 +676,10 @@ redlink.jwt.secret=PASTE_A_GENERATED_SECRET_HERE
 # Optional: creates the first admin account on the next start (you'll change the password at first sign-in)
 redlink.admin.email=admin@redlink.lk
 redlink.admin.password=CHOOSE_8_TO_72_CHARACTERS
+
+# Optional, this machine only: sample hospitals and donors for testing by hand (see "Sample data" below)
+redlink.seed.enabled=true
+redlink.seed.password=CHOOSE_8_TO_72_CHARACTERS
 ```
 
 Generate a secret with either of these:
@@ -706,6 +716,27 @@ Started BackendApplication in X seconds
 
 On the first run, Flyway creates all the tables. Look for `Successfully applied 1 migration to schema "public"`. If you set the admin settings, you'll also see `Created the first admin account: admin@redlink.lk`. **Leave this terminal open.**
 
+#### Sample data
+
+With `redlink.seed.enabled=true`, each start makes sure these accounts exist (anything already there is skipped, so there are no duplicates). They all sign in with your `redlink.seed.password` and don't have to change it.
+
+| Account | Email | Notes |
+|---|---|---|
+| Admin | `admin@seed.redlink.lk` | |
+| Staff, approved hospital | `staff.approved@seed.redlink.lk` | National Hospital Colombo (`SEED-0001`) |
+| Staff, pending hospital | `staff.pending@seed.redlink.lk` | Teaching Hospital Kandy (`SEED-0002`) |
+| Staff, rejected hospital | `staff.rejected@seed.redlink.lk` | Northern Care Hospital (`SEED-0003`), with a reason |
+| 20 donors | `firstname.lastname@seed.redlink.lk`, e.g. `kamal.perera@seed.redlink.lk` | All 8 blood groups; Colombo, Kandy, Galle, Jaffna, Kurunegala |
+
+The donors are chosen to exercise matching. Donation dates are counted back from the day you start the app, so they stay the same relative to today:
+
+- **Never donated:** Kamal Perera, Ishara Gunasekara, Priyanka Herath, Anushka Peiris and others
+- **Donated recently (not eligible):** Ruwan Silva (30 days), Chamari Rathnayake (60), Hasini Senanayake (10)
+- **The edge of the 90-day rule:** Kasun Dissanayake (89 days, not yet eligible), Sivakumar Rajan (90 days, eligible)
+- **Unavailable:** Sajith Bandara, Fathima Nazeer
+
+The full list is in [`DevDataSeeder`](backend/src/main/java/com/redlink/backend/config/DevDataSeeder.java). Never enable the seeder on a deployed server. To start again from scratch, recreate the `redLink` database (see Troubleshooting).
+
 ### 5. Start the frontend
 
 In a **second terminal**:
@@ -725,6 +756,7 @@ Until the sign-in form exists, open **http://localhost:5173/dev/components** and
 | Error | Cause and fix |
 |---|---|
 | `database "redLink" does not exist` | Create it (step 2) and check the exact spelling and case |
+| `database "redLink_test" does not exist` (in `./mvnw test`) | Create the test database (step 2) |
 | `password authentication failed` | Wrong password in `application-local.properties` |
 | `Connection to localhost:5432 refused` | PostgreSQL isn't running; start it in `services.msc` (Windows) |
 | `Port 8080 was already in use` | Another app is using the port; stop it or change `server.port` and the proxy target in `vite.config.ts` |
@@ -822,11 +854,14 @@ For hospital staff, `user` also has `hospitalId` and `hospitalStatus` (`PENDING`
 
 ### Option 2: Postman
 
-1. **POST** `{{baseUrl}}/auth/login` with **Body → raw → JSON** `{"email":"…","password":"…"}`.
-2. In that request's **Scripts → Post-response** tab, save the token: `pm.environment.set("token", pm.response.json().token);`
-3. For every other request, set **Authorization → Bearer Token** to `{{token}}`.
+The repo includes a ready-made collection in [`postman/`](postman/):
 
-Create a Postman **environment** with `baseUrl = http://localhost:8080/api`. Switching to the deployed API later then only needs a different environment.
+1. In Postman, choose **Import** and select both files in `postman/`: `RedLink.postman_collection.json` and `RedLink-Local.postman_environment.json`.
+2. Select the **RedLink Local** environment (top right) and set `seedPassword` to your `redlink.seed.password` (see [Sample data](#sample-data)).
+3. Run a request in **1. Sign in** (admin, approved staff, pending staff or donor). Its script saves the token, and every other request sends it automatically.
+4. Run anything in **2. Auth** or **3. Donors (admin)**. To act as someone else, run another sign-in request.
+
+The registration requests use `{{$timestamp}}`, so each run creates a new account and signs in as it. To use the deployed API later, duplicate the environment and change `baseUrl`. When you add an endpoint, add it to the collection too (export it from Postman over the file in `postman/`).
 
 ### Option 3: Through the frontend
 
@@ -859,19 +894,45 @@ cd backend
 | `AuthFlowIntegrationTest` | Registration, login, `/me`, password change and role rules through the whole app with real tokens | ✅ |
 | `RegistrationRollbackTest` | A failure halfway through hospital registration leaves nothing in the database | ✅ |
 | `JwtServiceTest` | Token contents and lifetime; expired, forged and wrong-issuer tokens are rejected; BCrypt hashing | ❌ |
+| `SecurityRulesTest` | The role rules for `/api/requests`: staff manage requests, donors respond, everyone else gets 403 | ❌ |
 | `CurrentUserTest` | Reading the user from the token; deleted accounts → 401, disabled → 403 | ❌ |
 | `RegistrationServiceAgeTest` | The 18–60 donor age rule at its exact edges | ❌ |
 | `AdminSeederTest` | The first admin is created once, with a hashed password it must change; bad settings refuse to start | ❌ |
+| `DevDataSeederTest` | Sample data is off unless enabled, creates every account once (no duplicates on restart), and covers every blood group and the 90-day edges | ✅ |
 | `DonorControllerTest` | Donor endpoints, their errors, and 401 / 403 for missing tokens and wrong roles (`@WebMvcTest`) | ❌ |
 | `GlobalExceptionHandlerTest` | Every error case produces the error format, and 500s don't leak internals (uses a test-only controller) | ❌ |
-| `BloodGroupTest` | Every blood group converts to its label (`A+`) and back | ❌ |
+| `BloodGroupTest` | Every blood group converts to its label (`A+`) and back; red cell compatibility matches the table in [Matching engine](#matching-engine) | ❌ |
+| `DonorEligibilityTest` | The 90-day rule at its exact edges, and that the matching query's cutoff date agrees with it | ❌ |
 
-Tests that need PostgreSQL use your local `redLink` database. They run inside a transaction that is **rolled back**, use unique `@test.redlink.lk` emails, and keep the admin seeder switched off, so your data is never changed. Tests use their own JWT secret from `src/test/resources/config/application.properties`.
+Tests that need PostgreSQL use the separate `redLink_test` database (create it in [step 2](#2-create-the-database)), with the same user and password as the app. They run inside a transaction that is **rolled back**, use unique `@test.redlink.lk` emails, and keep the admin seeder switched off. Tests use their own JWT secret from `src/test/resources/config/application.properties`.
+
+**Writing a new test.** Pick the lightest kind that covers it:
+
+| Kind | Use for | How |
+|---|---|---|
+| Plain unit test | Rules and calculations (`DonorEligibilityTest`) | `new` the class; pass a fixed `Clock` or date |
+| Controller test | Request/response shape, validation, 401/403 | `@WebMvcTest(XController.class)` + `@Import(SecurityConfig.class)`, `@MockitoBean` the service, `.with(TestAuth.ADMIN)` |
+| Integration test | Services and queries against real PostgreSQL | `@IntegrationTest`, then inject `MockMvc` and `TestData` |
+
+```java
+@IntegrationTest
+class MatchingIntegrationTest {
+    @Autowired MockMvc mvc;
+    @Autowired TestData testData;
+
+    @Test
+    void example() throws Exception {
+        Donor donor = testData.donor(BloodGroup.O_NEG, "Kandy", null);   // never donated
+        User staff = testData.staff(testData.hospital(HospitalStatus.APPROVED));
+        mvc.perform(get("/api/...").header("Authorization", testData.bearer(staff)));
+    }
+}
+```
 
 To run only the tests that don't need a database:
 
 ```bash
-./mvnw test -Dtest="JwtServiceTest,CurrentUserTest,RegistrationServiceAgeTest,AdminSeederTest,DonorControllerTest,GlobalExceptionHandlerTest,BloodGroupTest"
+./mvnw test -Dtest="JwtServiceTest,CurrentUserTest,RegistrationServiceAgeTest,AdminSeederTest,DonorControllerTest,GlobalExceptionHandlerTest,BloodGroupTest,DonorEligibilityTest,SecurityRulesTest"
 ```
 
 ### Planned endpoints
@@ -960,7 +1021,7 @@ The workflow in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on e
 
 | Job | Steps |
 |---|---|
-| **Backend (build + test)** | Starts a temporary PostgreSQL 18 database, sets up Java 25, runs `./mvnw verify` (compile + tests) |
+| **Backend (build + test)** | Starts a temporary PostgreSQL 18 database (`redLink_test`), sets up Java 25, runs `./mvnw verify` (compile + tests) |
 | **Frontend (lint + build)** | Sets up Node.js 24, runs `npm ci`, `npm run lint` and `npm run build` |
 
 Run the same checks locally before pushing:
@@ -982,6 +1043,7 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Frontend foundation: design tokens, UI components, screen states, auth plumbing, role-based routing and app shell
 - [x] Authentication and roles with Spring Security + JWT
 - [x] Startup seeder for the first admin account
+- [x] Sample data for local testing (admin, hospitals, 20 donors), switched on per machine
 - [x] Donor registration and hospital registration (hospital + first staff user)
 - [x] Change own password (API)
 - [ ] Frontend sign-in, registration and change-password pages (replacing the dev sign-in)
