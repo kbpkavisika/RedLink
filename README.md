@@ -107,7 +107,7 @@ The staff user can log in at every stage, so they always see where their hospita
 | `APPROVED` | Full dashboard | ✅ |
 | `REJECTED` | "Registration was not approved", with the admin's reason | ❌ |
 
-Further staff accounts are created by the admin in **Manage users**.
+Further staff accounts are created by the admin in **Users → Add staff user** (approved hospitals only), with a temporary password the admin passes on. A decision on a hospital is final: an approved or rejected hospital can't be reviewed again.
 
 ### Accounts and passwords
 
@@ -477,8 +477,8 @@ erDiagram
 | `city` | varchar | | Used for matching nearby donors |
 | `phone` | varchar | | Contact number |
 | `status` | varchar | | `PENDING` → `APPROVED` or `REJECTED` |
-| `approved_by` | bigint | 🔗 users | The admin who approved it |
-| `approved_at` | timestamp | | When it was approved |
+| `approved_by` | bigint | 🔗 users | The admin who approved or rejected it |
+| `approved_at` | timestamp | | When it was approved or rejected |
 | `rejection_reason` | varchar | | Why the admin rejected it (only set when `REJECTED`) |
 | `created_at` | timestamp | | When it registered |
 
@@ -613,7 +613,9 @@ RedLink/
     │   │   ├── enums/               # Role, BloodGroup, statuses, urgency
     │   │   └── converter/           # BloodGroup ⇄ "A+" database converter
     │   ├── dto/                     # Request/response records, ApiError
-    │   │   └── auth/                # Register, login, current user, change password
+    │   │   ├── auth/                # Register, login, current user, change password
+    │   │   ├── hospital/            # Admin hospital review
+    │   │   └── user/                # Admin user management
     │   ├── exception/               # ApiException types + GlobalExceptionHandler
     │   ├── security/                # SecurityConfig (role rules), JwtService, CurrentUser
     │   ├── config/                  # redlink.* settings, admin seeder, sample data seeder, clock
@@ -786,6 +788,12 @@ Start the backend first (step 4). All endpoints are under `http://localhost:8080
 | `PATCH` | `/api/auth/me/password` | Signed in | Change own password (`currentPassword`, `newPassword`) |
 | `GET` | `/api/donors` | Admin | List all donors |
 | `GET` | `/api/donors/{id}` | Admin | One donor; `404` in the [error format](#error-format) if the ID doesn't exist |
+| `GET` | `/api/admin/hospitals?status=` | Admin | All hospitals, newest first; with `status` (`PENDING`, `APPROVED`, `REJECTED`) only that queue, oldest first |
+| `GET` | `/api/admin/hospitals/{id}` | Admin | Address, phone, staff contacts, and who decided and when (`reviewedBy`, `reviewedAt`) |
+| `PATCH` | `/api/admin/hospitals/{id}/status` | Admin | `{"status":"APPROVED"}` or `{"status":"REJECTED","reason":"…"}` (reason required, max 500). Only `PENDING` hospitals: a decision is final (`409`) |
+| `GET` | `/api/admin/users?role=&q=` | Admin | Users newest first (max 200); optional role, and `q` matching part of the name or email |
+| `POST` | `/api/admin/users` | Admin | Add `HOSPITAL_STAFF` to an approved hospital with a temporary password; `201` |
+| `PATCH` | `/api/admin/users/{id}/password` | Admin | Set a temporary password (not your own); the user must change it at next sign-in |
 
 Everything except register and login needs the header `Authorization: Bearer <token>`.
 
@@ -859,7 +867,9 @@ The repo includes a ready-made collection in [`postman/`](postman/):
 1. In Postman, choose **Import** and select both files in `postman/`: `RedLink.postman_collection.json` and `RedLink-Local.postman_environment.json`.
 2. Select the **RedLink Local** environment (top right) and set `seedPassword` to your `redlink.seed.password` (see [Sample data](#sample-data)).
 3. Run a request in **1. Sign in** (admin, approved staff, pending staff or donor). Its script saves the token, and every other request sends it automatically.
-4. Run anything in **2. Auth** or **3. Donors (admin)**. To act as someone else, run another sign-in request.
+4. Run anything in the other folders. To act as someone else, run another sign-in request.
+   - **4. Admin: hospitals:** run **Pending queue** first; it saves the oldest pending hospital for the details, approve and reject requests.
+   - **5. Admin: users:** run **All hospitals** (in 4) first, so **Add staff user** has an approved hospital.
 
 The registration requests use `{{$timestamp}}`, so each run creates a new account and signs in as it. To use the deployed API later, duplicate the environment and change `baseUrl`. When you add an endpoint, add it to the collection too (export it from Postman over the file in `postman/`).
 
@@ -893,6 +903,8 @@ cd backend
 | `BackendApplicationTests` (`contextLoads`) | The app starts, Flyway migrations run and every entity matches its table | ✅ |
 | `AuthFlowIntegrationTest` | Registration, login, `/me`, password change and role rules through the whole app with real tokens | ✅ |
 | `RegistrationRollbackTest` | A failure halfway through hospital registration leaves nothing in the database | ✅ |
+| `AdminHospitalIntegrationTest` | The approval queue, hospital details, approve and reject (reason required, decision final), and 403 for non-admins | ✅ |
+| `AdminUserIntegrationTest` | User search and role filter, adding staff (approved hospitals only, unique email), temporary passwords that must be changed | ✅ |
 | `JwtServiceTest` | Token contents and lifetime; expired, forged and wrong-issuer tokens are rejected; BCrypt hashing | ❌ |
 | `SecurityRulesTest` | The role rules for `/api/requests`: staff manage requests, donors respond, everyone else gets 403 | ❌ |
 | `CurrentUserTest` | Reading the user from the token; deleted accounts → 401, disabled → 403 | ❌ |
@@ -939,10 +951,6 @@ To run only the tests that don't need a database:
 
 | Method | Endpoint | Role | Description |
 |---|---|---|---|
-| `GET` | `/api/admin/hospitals?status=PENDING` | Admin | Hospitals waiting for approval |
-| `PATCH` | `/api/admin/hospitals/{id}/status` | Admin | Approve or reject a hospital (reject requires a reason) |
-| `POST` | `/api/admin/users` | Admin | Add a staff user to an approved hospital, with a temporary password |
-| `PATCH` | `/api/admin/users/{id}/password` | Admin | Set a temporary password (sets `must_change_password`) |
 | `POST` | `/api/requests` | Hospital | Create a blood request |
 | `GET` | `/api/requests/{id}/matches` | Hospital | Ranked list of matching donors |
 | `GET` | `/api/requests/{id}/responses` | Hospital | Donor responses to a request |
@@ -1047,8 +1055,8 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Donor registration and hospital registration (hospital + first staff user)
 - [x] Change own password (API)
 - [x] Frontend sign-in, registration and change-password pages, and the hospital approval screen
-- [ ] Admin approval of hospitals, with rejection reason
-- [ ] Admin user management: add staff users, set temporary passwords
+- [x] Admin approval of hospitals, with rejection reason
+- [x] Admin user management: search users, add staff users, set temporary passwords
 - [ ] Blood requests and the matching engine
 - [ ] Configurable notification count (units × urgency multiplier, capped)
 - [ ] Donor responses (accept, decline, withdraw) and donation history

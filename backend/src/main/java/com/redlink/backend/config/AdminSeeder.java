@@ -14,7 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Creates the first admin at startup (decision 4). Nobody can register as an admin, so this is the only
- * way the first one exists; further admins are added by an admin.
+ * way the first one exists. The app can't add more admins yet (POST /api/admin/users only adds hospital staff),
+ * so a second admin would have to be created in the database.
  *
  *   an admin already exists       → do nothing
  *   redlink.admin.* not set       → log a warning and carry on
