@@ -42,7 +42,69 @@ export interface DonorSummary {
   lastDonationDate: string | null; // ISO date, e.g. "2026-05-01"
 }
 
-// ---- Auth (planned: POST /api/auth/login, GET /api/auth/me) ----
+// ---- Admin: hospitals (backend: dto/hospital) ----
+
+export interface HospitalSummary {
+  id: number;
+  name: string;
+  registrationNo: string;
+  city: string;
+  status: HospitalStatus;
+  createdAt: string; // ISO timestamp: when it registered
+}
+
+export interface HospitalStaffMember {
+  id: number;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  enabled: boolean;
+}
+
+export interface HospitalDetail extends HospitalSummary {
+  address: string;
+  phone: string;
+  reviewedBy: string | null; // the admin who approved or rejected it
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+  staff: HospitalStaffMember[]; // first is the person who registered it
+}
+
+// PATCH /api/admin/hospitals/{id}/status. reason is required for REJECTED (max 500 characters).
+export interface UpdateHospitalStatusRequest {
+  status: Exclude<HospitalStatus, 'PENDING'>;
+  reason?: string;
+}
+
+// ---- Admin: users (backend: dto/user) ----
+
+export interface UserSummary {
+  id: number;
+  fullName: string;
+  email: string;
+  phone?: string;
+  role: Role;
+  hospitalId?: number; // only for HOSPITAL_STAFF
+  hospitalName?: string;
+  enabled: boolean;
+  mustChangePassword: boolean;
+  createdAt: string; // ISO timestamp
+}
+
+// POST /api/admin/users: always creates HOSPITAL_STAFF for an APPROVED hospital
+export interface AddStaffRequest {
+  hospitalId: number;
+  fullName: string;
+  email: string;
+  phone: string;
+  temporaryPassword: string; // 8–72 characters; must be changed at first sign-in
+}
+
+export interface SetTemporaryPasswordRequest {
+  temporaryPassword: string;
+}
+
+// ---- Auth (backend: dto/auth) ----
 
 export interface CurrentUser {
   id: number;

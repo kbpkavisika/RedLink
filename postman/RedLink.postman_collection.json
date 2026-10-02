@@ -13,7 +13,10 @@
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:8080/api", "description": "Overridden by the environment's baseUrl when one is selected" },
     { "key": "token", "value": "", "description": "Set by the sign-in and registration requests" },
-    { "key": "donorId", "value": "1", "description": "Set by List donors (first donor in the list)" }
+    { "key": "donorId", "value": "1", "description": "Set by List donors (first donor in the list)" },
+    { "key": "hospitalId", "value": "1", "description": "Set by Pending queue (oldest pending hospital) or All hospitals" },
+    { "key": "approvedHospitalId", "value": "1", "description": "Set by All hospitals (first approved hospital); used by Add staff user" },
+    { "key": "userId", "value": "1", "description": "Set by Search users (first result) and Add staff user" }
   ],
   "item": [
     {
@@ -229,6 +232,213 @@
             "method": "GET",
             "header": [],
             "url": { "raw": "{{baseUrl}}/donors", "host": ["{{baseUrl}}"], "path": ["donors"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Admin: hospitals",
+      "description": "Sign in as admin first; other roles get 403. Run Pending queue first: it saves the oldest pending hospital as {{hospitalId}}. A decision is final, so approving or rejecting the same hospital twice gives 409.",
+      "item": [
+        {
+          "name": "Pending queue",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "const hospitals = pm.response.json();",
+              "if (hospitals.length > 0) {",
+              "  pm.collectionVariables.set(\"hospitalId\", hospitals[0].id);",
+              "  console.log(`Saved hospitalId ${hospitals[0].id} (${hospitals[0].name}).`);",
+              "} else {",
+              "  console.log('No pending hospitals. Run Register hospital in 2. Auth to make one.');",
+              "}"
+            ] } }
+          ],
+          "request": {
+            "description": "Hospitals waiting for approval, oldest first.",
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/hospitals?status=PENDING",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "hospitals"],
+              "query": [{ "key": "status", "value": "PENDING", "description": "PENDING, APPROVED or REJECTED; leave out for all" }]
+            }
+          }
+        },
+        {
+          "name": "All hospitals",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "const approved = pm.response.json().find((h) => h.status === 'APPROVED');",
+              "if (approved) {",
+              "  pm.collectionVariables.set(\"approvedHospitalId\", approved.id);",
+              "  console.log(`Saved approvedHospitalId ${approved.id} (${approved.name}).`);",
+              "}"
+            ] } }
+          ],
+          "request": {
+            "description": "Every hospital, newest first.",
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/admin/hospitals", "host": ["{{baseUrl}}"], "path": ["admin", "hospitals"] }
+          }
+        },
+        {
+          "name": "Hospital details",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ] } }
+          ],
+          "request": {
+            "description": "Address, phone, staff contacts, and who decided and when.",
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/admin/hospitals/{{hospitalId}}", "host": ["{{baseUrl}}"], "path": ["admin", "hospitals", "{{hospitalId}}"] }
+          }
+        },
+        {
+          "name": "Approve hospital",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Approved\", () => {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().status).to.eql('APPROVED');",
+              "});"
+            ] } }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/hospitals/{{hospitalId}}/status", "host": ["{{baseUrl}}"], "path": ["admin", "hospitals", "{{hospitalId}}", "status"] }
+          }
+        },
+        {
+          "name": "Reject hospital",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Rejected\", () => {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().status).to.eql('REJECTED');",
+              "});"
+            ] } }
+          ],
+          "request": {
+            "description": "The reason is required (max 500 characters) and is shown to the hospital's staff.",
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"REJECTED\",\n  \"reason\": \"Registration number not found in the Ministry of Health register.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/hospitals/{{hospitalId}}/status", "host": ["{{baseUrl}}"], "path": ["admin", "hospitals", "{{hospitalId}}", "status"] }
+          }
+        },
+        {
+          "name": "Reject without a reason (400)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 400 on reason\", () => {",
+              "  pm.response.to.have.status(400);",
+              "  pm.expect(pm.response.json().fieldErrors[0].field).to.eql('reason');",
+              "});"
+            ] } }
+          ],
+          "request": {
+            "description": "Run on a PENDING hospital; an already-decided one gives 409 first.",
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"REJECTED\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/hospitals/{{hospitalId}}/status", "host": ["{{baseUrl}}"], "path": ["admin", "hospitals", "{{hospitalId}}", "status"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Admin: users",
+      "description": "Sign in as admin first; other roles get 403. Run All hospitals in 4 first, so Add staff user has an approved hospital.",
+      "item": [
+        {
+          "name": "Search users",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "const users = pm.response.json();",
+              "if (users.length > 0) {",
+              "  pm.collectionVariables.set(\"userId\", users[0].id);",
+              "  console.log(`Saved userId ${users[0].id} (${users[0].email}).`);",
+              "}"
+            ] } }
+          ],
+          "request": {
+            "description": "Newest first, at most 200. Both parameters are optional; q matches part of the name or email, ignoring case.",
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users?role=DONOR&q=kamal",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users"],
+              "query": [
+                { "key": "role", "value": "DONOR", "description": "ADMIN, HOSPITAL_STAFF or DONOR" },
+                { "key": "q", "value": "kamal", "description": "Part of a name or email" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add staff user",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Created\", () => pm.response.to.have.status(201));",
+              "const user = pm.response.json();",
+              "pm.collectionVariables.set(\"userId\", user.id);",
+              "console.log(`Added ${user.email} to ${user.hospitalName}. They sign in with the temporary password and must change it.`);"
+            ] } }
+          ],
+          "request": {
+            "description": "Adds HOSPITAL_STAFF to an APPROVED hospital ({{approvedHospitalId}}). Uses {{$timestamp}} so the email is new every time.",
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hospitalId\": {{approvedHospitalId}},\n  \"fullName\": \"Postman Colleague\",\n  \"email\": \"colleague-{{$timestamp}}@example.lk\",\n  \"phone\": \"0712345678\",\n  \"temporaryPassword\": \"Temp-Pass-2026\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/users", "host": ["{{baseUrl}}"], "path": ["admin", "users"] }
+          }
+        },
+        {
+          "name": "Set temporary password",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Must change it\", () => {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().mustChangePassword).to.eql(true);",
+              "});"
+            ] } }
+          ],
+          "request": {
+            "description": "For {{userId}}. Their old password stops working; they must choose a new one at their next sign-in. Not allowed on your own account (400).",
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"temporaryPassword\": \"Temp-Pass-2026\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/admin/users/{{userId}}/password", "host": ["{{baseUrl}}"], "path": ["admin", "users", "{{userId}}", "password"] }
           }
         }
       ]

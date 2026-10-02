@@ -8,6 +8,8 @@ import { AppShell } from './components/layout/AppShell';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
 import { DonorsPage } from './pages/admin/DonorsPage';
+import { HospitalsPage } from './pages/admin/HospitalsPage';
+import { UsersPage } from './pages/admin/UsersPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -84,14 +86,8 @@ export default function App() {
             </Route>
 
             <Route element={<RequireAuth role="ADMIN" />}>
-              <Route
-                path="/admin/hospitals"
-                element={<ComingSoonPage title="Hospital approvals" description="Hospitals waiting for review." />}
-              />
-              <Route
-                path="/admin/users"
-                element={<ComingSoonPage title="Users" description="Add staff and reset passwords." />}
-              />
+              <Route path="/admin/hospitals" element={<HospitalsPage />} />
+              <Route path="/admin/users" element={<UsersPage />} />
               <Route
                 path="/admin/requests"
                 element={<ComingSoonPage title="All requests" description="Requests across every hospital." />}
