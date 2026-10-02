@@ -76,6 +76,34 @@ export interface UpdateHospitalStatusRequest {
   reason?: string;
 }
 
+// ---- Admin: users (backend: dto/user) ----
+
+export interface UserSummary {
+  id: number;
+  fullName: string;
+  email: string;
+  phone?: string;
+  role: Role;
+  hospitalId?: number; // only for HOSPITAL_STAFF
+  hospitalName?: string;
+  enabled: boolean;
+  mustChangePassword: boolean;
+  createdAt: string; // ISO timestamp
+}
+
+// POST /api/admin/users: always creates HOSPITAL_STAFF for an APPROVED hospital
+export interface AddStaffRequest {
+  hospitalId: number;
+  fullName: string;
+  email: string;
+  phone: string;
+  temporaryPassword: string; // 8–72 characters; must be changed at first sign-in
+}
+
+export interface SetTemporaryPasswordRequest {
+  temporaryPassword: string;
+}
+
 // ---- Auth (backend: dto/auth) ----
 
 export interface CurrentUser {

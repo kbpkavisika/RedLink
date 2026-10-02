@@ -11,6 +11,7 @@ export { LinkButton } from './LinkButton';
 export { Panel } from './Panel';
 export { PasswordInput } from './PasswordInput';
 export { SegmentedControl, type SegmentOption } from './SegmentedControl';
+export { Select } from './Select';
 export { Skeleton, SkeletonRows } from './Skeleton';
 export { StateView, type ScreenState } from './StateView';
 export { StepProgress } from './StepProgress';
