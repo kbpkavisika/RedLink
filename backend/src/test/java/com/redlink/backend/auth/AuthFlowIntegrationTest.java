@@ -161,6 +161,7 @@ class AuthFlowIntegrationTest {
                 .andExpect(jsonPath("$.user.hospitalStatus").value("PENDING"))
                 .andExpect(jsonPath("$.user.hospitalId").isNumber())
                 .andExpect(jsonPath("$.user.hospitalName").value("Nawaloka Hospital"))
+                .andExpect(jsonPath("$.user.hospitalCity").value("Colombo"))
                 .andExpect(jsonPath("$.user.hospitalRejectionReason").doesNotExist());
 
         User staff = userRepository.findByEmail(email("dilini")).orElseThrow();

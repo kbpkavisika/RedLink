@@ -16,7 +16,8 @@
     { "key": "donorId", "value": "1", "description": "Set by List donors (first donor in the list)" },
     { "key": "hospitalId", "value": "1", "description": "Set by Pending queue (oldest pending hospital) or All hospitals" },
     { "key": "approvedHospitalId", "value": "1", "description": "Set by All hospitals (first approved hospital); used by Add staff user" },
-    { "key": "userId", "value": "1", "description": "Set by Search users (first result) and Add staff user" }
+    { "key": "userId", "value": "1", "description": "Set by Search users (first result) and Add staff user" },
+    { "key": "requestId", "value": "1", "description": "Set by Post a request" }
   ],
   "item": [
     {
@@ -439,6 +440,139 @@
               "options": { "raw": { "language": "json" } }
             },
             "url": { "raw": "{{baseUrl}}/admin/users/{{userId}}/password", "host": ["{{baseUrl}}"], "path": ["admin", "users", "{{userId}}", "password"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Blood requests",
+      "description": "Sign in as approved hospital staff first (1. Sign in). Post a request saves requestId for the others.",
+      "item": [
+        {
+          "name": "Post a request",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "// Needed by this time tomorrow, as an ISO timestamp",
+              "pm.variables.set(\"neededBy\", new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Created\", () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.test(\"Never notifies more than the matches\", () => pm.expect(body.notifiedCount).to.be.at.most(body.matchCount));",
+              "pm.collectionVariables.set(\"requestId\", body.request.id);",
+              "console.log(`#${body.request.reference} is live: notified ${body.notifiedCount} of ${body.matchCount} matches.`);"
+            ] } }
+          ],
+          "request": {
+            "description": "LOW × 2 units notifies up to 4 donors (units × urgency multiplier, capped at 25).",
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bloodGroup\": \"A+\",\n  \"unitsNeeded\": 2,\n  \"urgency\": \"LOW\",\n  \"city\": \"Colombo\",\n  \"neededBy\": \"{{neededBy}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/requests", "host": ["{{baseUrl}}"], "path": ["requests"] }
+          }
+        },
+        {
+          "name": "Request details",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ] } }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/requests/{{requestId}}", "host": ["{{baseUrl}}"], "path": ["requests", "{{requestId}}"] }
+          }
+        },
+        {
+          "name": "Ranked matches",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "const matches = pm.response.json();",
+              "pm.test(\"Exact group before substitutes\", () => {",
+              "  const firstSubstitute = matches.findIndex(m => !m.exactMatch);",
+              "  pm.expect(firstSubstitute === -1 || matches.slice(firstSubstitute).every(m => !m.exactMatch)).to.be.true;",
+              "});"
+            ] } }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/requests/{{requestId}}/matches", "host": ["{{baseUrl}}"], "path": ["requests", "{{requestId}}", "matches"] }
+          }
+        },
+        {
+          "name": "Matches: O- donors only",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Only O-\", () => pm.response.json().forEach(m => pm.expect(m.bloodGroup).to.eql(\"O-\")));"
+            ] } }
+          ],
+          "request": {
+            "description": "Write O+ as O%2B in a URL: an unencoded + means a space.",
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/requests/{{requestId}}/matches?bloodGroup=O-",
+              "host": ["{{baseUrl}}"],
+              "path": ["requests", "{{requestId}}", "matches"],
+              "query": [{ "key": "bloodGroup", "value": "O-" }]
+            }
+          }
+        },
+        {
+          "name": "Matches: Colombo only",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"All in the same city\", () => pm.response.json().forEach(m => pm.expect(m.sameCity).to.be.true));"
+            ] } }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/requests/{{requestId}}/matches?city=colombo",
+              "host": ["{{baseUrl}}"],
+              "path": ["requests", "{{requestId}}", "matches"],
+              "query": [{ "key": "city", "value": "colombo" }]
+            }
+          }
+        },
+        {
+          "name": "Post as a pending hospital (403)",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "// Signs in as the pending hospital's staff for this request only; the saved token is untouched",
+              "pm.variables.set(\"neededBy\", new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());",
+              "pm.sendRequest({",
+              "  url: pm.variables.replaceIn(\"{{baseUrl}}/auth/login\"),",
+              "  method: \"POST\",",
+              "  header: { \"Content-Type\": \"application/json\" },",
+              "  body: { mode: \"raw\", raw: JSON.stringify({ email: \"staff.pending@seed.redlink.lk\", password: pm.variables.get(\"seedPassword\") }) }",
+              "}, (err, res) => pm.variables.set(\"pendingToken\", res.json().token));"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 403\", () => pm.response.to.have.status(403));",
+              "pm.test(\"Explains why\", () => pm.expect(pm.response.json().message).to.include(\"approves your hospital\"));"
+            ] } }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{pendingToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bloodGroup\": \"O+\",\n  \"unitsNeeded\": 1,\n  \"urgency\": \"HIGH\",\n  \"city\": \"Kandy\",\n  \"neededBy\": \"{{neededBy}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/requests", "host": ["{{baseUrl}}"], "path": ["requests"] }
           }
         }
       ]

@@ -1,18 +1,26 @@
 package com.redlink.backend.support;
 
+import com.redlink.backend.model.BloodRequest;
 import com.redlink.backend.model.Donor;
+import com.redlink.backend.model.DonorResponse;
 import com.redlink.backend.model.Hospital;
 import com.redlink.backend.model.User;
 import com.redlink.backend.model.enums.BloodGroup;
 import com.redlink.backend.model.enums.HospitalStatus;
+import com.redlink.backend.model.enums.ResponseStatus;
 import com.redlink.backend.model.enums.Role;
+import com.redlink.backend.model.enums.Urgency;
+import com.redlink.backend.repository.BloodRequestRepository;
 import com.redlink.backend.repository.DonorRepository;
+import com.redlink.backend.repository.DonorResponseRepository;
 import com.redlink.backend.repository.HospitalRepository;
 import com.redlink.backend.repository.UserRepository;
 import com.redlink.backend.security.JwtService;
 import org.springframework.boot.test.context.TestComponent;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -36,6 +44,8 @@ public class TestData {
     private final UserRepository userRepository;
     private final HospitalRepository hospitalRepository;
     private final DonorRepository donorRepository;
+    private final BloodRequestRepository bloodRequestRepository;
+    private final DonorResponseRepository donorResponseRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
@@ -44,10 +54,14 @@ public class TestData {
     private String passwordHash; // BCrypt is slow on purpose, so hash once
 
     public TestData(UserRepository userRepository, HospitalRepository hospitalRepository,
-                    DonorRepository donorRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+                    DonorRepository donorRepository, BloodRequestRepository bloodRequestRepository,
+                    DonorResponseRepository donorResponseRepository, PasswordEncoder passwordEncoder,
+                    JwtService jwtService) {
         this.userRepository = userRepository;
         this.hospitalRepository = hospitalRepository;
         this.donorRepository = donorRepository;
+        this.bloodRequestRepository = bloodRequestRepository;
+        this.donorResponseRepository = donorResponseRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
@@ -112,6 +126,27 @@ public class TestData {
         donor.setCity(city);
         donor.setLastDonationDate(lastDonationDate);
         return donorRepository.save(donor);
+    }
+
+    // An OPEN request for 1 unit at MEDIUM urgency, needed within 2 days, posted by this staff member
+    public BloodRequest bloodRequest(User staff, BloodGroup bloodGroup, String city) {
+        BloodRequest request = new BloodRequest();
+        request.setHospital(staff.getHospital());
+        request.setCreatedBy(staff);
+        request.setBloodGroup(bloodGroup);
+        request.setUnitsNeeded(1);
+        request.setUrgency(Urgency.MEDIUM);
+        request.setCity(city);
+        request.setNeededBy(Instant.now().plus(Duration.ofDays(2)));
+        return bloodRequestRepository.save(request);
+    }
+
+    public DonorResponse response(BloodRequest request, Donor donor, ResponseStatus status) {
+        DonorResponse response = new DonorResponse();
+        response.setRequest(request);
+        response.setDonor(donor);
+        response.setStatus(status);
+        return donorResponseRepository.save(response);
     }
 
     public String token(User user) {

@@ -113,6 +113,7 @@ export interface CurrentUser {
   role: Role;
   hospitalId?: number;
   hospitalName?: string; // only for HOSPITAL_STAFF
+  hospitalCity?: string; // only for HOSPITAL_STAFF; the new-request form's default city
   hospitalStatus?: HospitalStatus; // only for HOSPITAL_STAFF; drives the Blocked state
   hospitalRejectionReason?: string; // only when hospitalStatus is REJECTED
   mustChangePassword: boolean;
@@ -162,4 +163,56 @@ export interface LoginResponse {
   token: string;
   expiresAt: string; // ISO timestamp
   user: CurrentUser;
+}
+
+// ---- Blood requests (backend: dto/request) ----
+
+// POST /api/requests. The hospital and poster come from the signed-in staff member.
+export interface CreateBloodRequestRequest {
+  bloodGroup: BloodGroup;
+  unitsNeeded: number; // 1–20
+  urgency: Urgency;
+  city: string;
+  neededBy: string; // ISO timestamp, must be in the future
+}
+
+export interface BloodRequestDetail {
+  id: number;
+  reference: string; // "RQ-1043"; show it as "#RQ-1043"
+  bloodGroup: BloodGroup;
+  unitsNeeded: number;
+  urgency: Urgency;
+  city: string;
+  status: RequestStatus;
+  neededBy: string;
+  createdAt: string;
+  closedAt: string | null; // set once the request stops being OPEN
+  hospitalName: string;
+  createdBy: string; // name of the staff member who posted it
+}
+
+// 201 from POST /api/requests
+export interface PostedRequestResponse {
+  request: BloodRequestDetail;
+  matchCount: number; // every donor who can give right now
+  notifiedCount: number; // how many of the best matches were notified
+}
+
+// GET /api/requests/{id}
+export interface RequestOverview {
+  request: BloodRequestDetail;
+  notifiedCount: number;
+}
+
+// One row of GET /api/requests/{id}/matches, best match first
+export interface MatchedDonor {
+  donorId: number;
+  name: string;
+  phone: string | null;
+  bloodGroup: BloodGroup;
+  city: string;
+  lastDonationDate: string | null; // ISO date; null = never donated
+  daysSinceLastDonation: number | null;
+  exactMatch: boolean; // same blood group as requested (otherwise a compatible substitute)
+  sameCity: boolean; // same city as the request
 }
