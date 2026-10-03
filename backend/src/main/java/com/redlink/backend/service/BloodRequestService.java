@@ -3,19 +3,25 @@ package com.redlink.backend.service;
 import com.redlink.backend.config.MatchingProperties;
 import com.redlink.backend.dto.request.BloodRequestDetail;
 import com.redlink.backend.dto.request.CreateBloodRequestRequest;
+import com.redlink.backend.dto.request.MatchedDonor;
 import com.redlink.backend.dto.request.PostedRequestResponse;
+import com.redlink.backend.dto.request.RequestOverview;
 import com.redlink.backend.exception.BadRequestException;
 import com.redlink.backend.exception.ForbiddenException;
+import com.redlink.backend.exception.NotFoundException;
 import com.redlink.backend.model.BloodRequest;
 import com.redlink.backend.model.Donor;
 import com.redlink.backend.model.Hospital;
 import com.redlink.backend.model.Notification;
 import com.redlink.backend.model.User;
+import com.redlink.backend.model.enums.BloodGroup;
 import com.redlink.backend.model.enums.HospitalStatus;
 import com.redlink.backend.model.enums.RequestStatus;
+import com.redlink.backend.model.enums.Role;
 import com.redlink.backend.repository.BloodRequestRepository;
 import com.redlink.backend.repository.NotificationRepository;
 import com.redlink.backend.security.CurrentUser;
+import com.redlink.backend.util.Cities;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -83,6 +89,39 @@ public class BloodRequestService {
                 .toList());
 
         return new PostedRequestResponse(BloodRequestDetail.from(request), matches.size(), notifiedCount);
+    }
+
+    public RequestOverview findById(Long id) {
+        BloodRequest request = ownRequest(id);
+        return new RequestOverview(BloodRequestDetail.from(request),
+                notificationRepository.countByRequestIdAndUserRole(id, Role.DONOR));
+    }
+
+    /**
+     * The ranked match list (H5), optionally narrowed (H12). Filters don't change the order.
+     *   bloodGroup: only donors of that group (a group that can't give to the request matches nobody)
+     *   city: only donors in that city, compared ignoring case and spaces
+     * A closed request has no matches: nobody should be contacted for it any more.
+     */
+    public List<MatchedDonor> findMatches(Long id, BloodGroup bloodGroup, String city) {
+        BloodRequest request = ownRequest(id);
+        if (request.getStatus() != RequestStatus.OPEN) {
+            return List.of();
+        }
+        boolean filterCity = city != null && !city.isBlank();
+        return matchingService.findMatches(request).stream()
+                .filter(match -> bloodGroup == null || match.bloodGroup() == bloodGroup)
+                .filter(match -> !filterCity || Cities.same(match.city(), city))
+                .toList();
+    }
+
+    // Staff only see their own hospital's requests; anyone else's is "not found", so ids reveal nothing
+    private BloodRequest ownRequest(Long id) {
+        User staff = currentUser.require();
+        return bloodRequestRepository.findByIdWithHospital(id)
+                .filter(request -> staff.getHospital() != null
+                        && request.getHospital().getId().equals(staff.getHospital().getId()))
+                .orElseThrow(() -> new NotFoundException("Request " + BloodRequestDetail.reference(id) + " was not found."));
     }
 
     // Hospital approval is not a role (README "Authentication"): staff are signed in, but can't post until APPROVED
