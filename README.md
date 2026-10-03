@@ -152,14 +152,17 @@ For a request with blood group **R** in city **C**, a donor is a match when **al
 | Check | Rule |
 |---|---|
 | Compatible | Donor's blood group can be given to **R** (table below) |
-| Available | `donors.available = true` |
+| Available | `donors.available = true`, and the donor's account is enabled |
 | Eligible | `last_donation_date` is empty **or** at least 90 days ago |
-| Not already responded | No row in `donor_responses` for this donor and request |
+| Not already responded | No row in `donor_responses` for this donor and request (accepted, declined or withdrawn) |
 
 Matches are **ranked** by:
 1. Exact blood group match before a compatible substitute (this saves scarce types such as O−)
-2. Same city as the request before other cities
-3. Longest time since last donation first
+2. Same city as the request before other cities. Cities are compared ignoring case and extra spaces, so `colombo` and `Colombo ` are the same city
+3. Longest time since last donation first; never donated counts as longest
+4. Then donor ID, so the order is the same every time
+
+The filters run in one database query (`DonorRepository.findMatchCandidates`); the ranking is `MatchRanking`, which has no database access so it can be unit tested exactly. A closed request (fulfilled, cancelled or expired) has no matches.
 
 **How many donors are notified.** Not every match is notified, so donors aren't flooded with requests that will be filled without them:
 
@@ -176,7 +179,7 @@ notified = min(units_needed × urgency multiplier, 25, number of matches)
 
 Example: 2 units of A+ at `HIGH` urgency with 46 matches notifies the top 10. The other 36 still appear in the hospital's ranked match list, so staff can contact them directly. If there are no matches, the request is still saved and the hospital sees suggestions instead.
 
-The multipliers and cap live in `application.properties`, so they can be tuned without code changes:
+The multipliers and cap live in `application.properties` (`MatchingProperties`), so they can be tuned without code changes. A missing or non-positive value stops the app at startup:
 
 ```properties
 redlink.matching.multiplier.low=2
@@ -619,7 +622,7 @@ RedLink/
     │   ├── exception/               # ApiException types + GlobalExceptionHandler
     │   ├── security/                # SecurityConfig (role rules), JwtService, CurrentUser
     │   ├── config/                  # redlink.* settings, admin seeder, sample data seeder, clock
-    │   ├── util/                    # Small helpers (email normalizing)
+    │   ├── util/                    # Small helpers (email and city normalizing)
     │   └── BackendApplication.java  # Entry point
     ├── src/main/resources/
     │   ├── db/migration/                  # Flyway SQL migrations (V1__…, V2__…)
@@ -794,6 +797,9 @@ Start the backend first (step 4). All endpoints are under `http://localhost:8080
 | `GET` | `/api/admin/users?role=&q=` | Admin | Users newest first (max 200); optional role, and `q` matching part of the name or email |
 | `POST` | `/api/admin/users` | Admin | Add `HOSPITAL_STAFF` to an approved hospital with a temporary password; `201` |
 | `PATCH` | `/api/admin/users/{id}/password` | Admin | Set a temporary password (not your own); the user must change it at next sign-in |
+| `POST` | `/api/requests` | Hospital (approved) | Post a request: `bloodGroup`, `unitsNeeded` (1–20), `urgency`, `city`, `neededBy` (future ISO time). Notifies the top matches; `201` with the request (`reference` "RQ-12"), `matchCount` and `notifiedCount`. `403` while the hospital isn't approved |
+| `GET` | `/api/requests/{id}` | Hospital | The request and how many donors were notified. Another hospital's request is `404` |
+| `GET` | `/api/requests/{id}/matches?bloodGroup=&city=` | Hospital | Ranked matches with phone, days since last donation, `exactMatch` and `sameCity`. Optional filters keep the order; encode `+` as `%2B` (`O%2B`) |
 
 Everything except register and login needs the header `Authorization: Bearer <token>`.
 
@@ -870,6 +876,7 @@ The repo includes a ready-made collection in [`postman/`](postman/):
 4. Run anything in the other folders. To act as someone else, run another sign-in request.
    - **4. Admin: hospitals:** run **Pending queue** first; it saves the oldest pending hospital for the details, approve and reject requests.
    - **5. Admin: users:** run **All hospitals** (in 4) first, so **Add staff user** has an approved hospital.
+   - **6. Blood requests:** sign in as approved staff and run **Post a request** first; it saves the request for the view and match requests.
 
 The registration requests use `{{$timestamp}}`, so each run creates a new account and signs in as it. To use the deployed API later, duplicate the environment and change `baseUrl`. When you add an endpoint, add it to the collection too (export it from Postman over the file in `postman/`).
 
@@ -915,6 +922,11 @@ cd backend
 | `GlobalExceptionHandlerTest` | Every error case produces the error format, and 500s don't leak internals (uses a test-only controller) | ❌ |
 | `BloodGroupTest` | Every blood group converts to its label (`A+`) and back; red cell compatibility matches the table in [Matching engine](#matching-engine) | ❌ |
 | `DonorEligibilityTest` | The 90-day rule at its exact edges, and that the matching query's cutoff date agrees with it | ❌ |
+| `MatchRankingTest` | The ranking order exactly: exact group → same city (ignoring case) → longest since donation → ID | ❌ |
+| `MatchingPropertiesTest` | Every cell of the notification table above, never more than the matches, and bad settings stopping the app | ❌ |
+| `MatchingIntegrationTest` | The match filters in PostgreSQL: compatible groups, available, enabled, the 90-day edge, already responded | ✅ |
+| `PostBloodRequestIntegrationTest` | Posting notifies exactly the top N, the notification text, the 25 cap, pending/rejected hospitals refused, validation | ✅ |
+| `ViewBloodRequestIntegrationTest` | Request details, ranked matches, the group and city filters, closed requests, other hospitals' requests are 404 | ✅ |
 
 Tests that need PostgreSQL use the separate `redLink_test` database (create it in [step 2](#2-create-the-database)), with the same user and password as the app. They run inside a transaction that is **rolled back**, use unique `@test.redlink.lk` emails, and keep the admin seeder switched off. Tests use their own JWT secret from `src/test/resources/config/application.properties`.
 
@@ -944,15 +956,13 @@ class MatchingIntegrationTest {
 To run only the tests that don't need a database:
 
 ```bash
-./mvnw test -Dtest="JwtServiceTest,CurrentUserTest,RegistrationServiceAgeTest,AdminSeederTest,DonorControllerTest,GlobalExceptionHandlerTest,BloodGroupTest,DonorEligibilityTest,SecurityRulesTest"
+./mvnw test -Dtest="JwtServiceTest,CurrentUserTest,RegistrationServiceAgeTest,AdminSeederTest,DonorControllerTest,GlobalExceptionHandlerTest,BloodGroupTest,DonorEligibilityTest,SecurityRulesTest,MatchRankingTest,MatchingPropertiesTest"
 ```
 
 ### Planned endpoints
 
 | Method | Endpoint | Role | Description |
 |---|---|---|---|
-| `POST` | `/api/requests` | Hospital | Create a blood request |
-| `GET` | `/api/requests/{id}/matches` | Hospital | Ranked list of matching donors |
 | `GET` | `/api/requests/{id}/responses` | Hospital | Donor responses to a request |
 | `PATCH` | `/api/requests/{id}/status` | Hospital | Mark fulfilled or cancelled |
 | `GET` | `/api/donor/me` | Donor | View own profile |
@@ -1057,8 +1067,8 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Frontend sign-in, registration and change-password pages, and the hospital approval screen
 - [x] Admin approval of hospitals, with rejection reason
 - [x] Admin user management: search users, add staff users, set temporary passwords
-- [ ] Blood requests and the matching engine
-- [ ] Configurable notification count (units × urgency multiplier, capped)
+- [x] Blood requests and the matching engine (post, ranked matches with filters, request page)
+- [x] Configurable notification count (units × urgency multiplier, capped)
 - [ ] Donor responses (accept, decline, withdraw) and donation history
 - [ ] Notifications
 - [ ] Role-based dashboards in the frontend (placeholders in place)
