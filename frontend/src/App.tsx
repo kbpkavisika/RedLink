@@ -16,6 +16,7 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { RegisterDonorPage } from './pages/RegisterDonorPage';
 import { RegisterHospitalPage } from './pages/RegisterHospitalPage';
 import { NewRequestPage } from './pages/hospital/NewRequestPage';
+import { RequestDetailPage } from './pages/hospital/RequestDetailPage';
 
 // Development only: in a production build this is null, so the gallery isn't bundled at all
 const ComponentGallery = import.meta.env.DEV ? lazy(() => import('./dev/ComponentGallery')) : null;
@@ -59,10 +60,7 @@ export default function App() {
                   element={<ComingSoonPage title="Requests" description="Every request your hospital has posted." />}
                 />
                 <Route path="/hospital/requests/new" element={<NewRequestPage />} />
-                <Route
-                  path="/hospital/requests/:id"
-                  element={<ComingSoonPage title="Request detail" description="Matched donors and their responses." />}
-                />
+                <Route path="/hospital/requests/:id" element={<RequestDetailPage />} />
               </Route>
             </Route>
 
