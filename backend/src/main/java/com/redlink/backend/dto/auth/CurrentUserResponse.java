@@ -19,6 +19,7 @@ public record CurrentUserResponse(
         Role role,
         Long hospitalId,
         String hospitalName,
+        String hospitalCity, // the new-request form's default city
         HospitalStatus hospitalStatus, // drives the frontend's Blocked state until APPROVED
         String hospitalRejectionReason, // the admin's reason, shown to staff of a rejected hospital
         boolean mustChangePassword
@@ -33,6 +34,7 @@ public record CurrentUserResponse(
                 user.getRole(),
                 hospital == null ? null : hospital.getId(),
                 hospital == null ? null : hospital.getName(),
+                hospital == null ? null : hospital.getCity(),
                 hospital == null ? null : hospital.getStatus(),
                 hospital == null ? null : hospital.getRejectionReason(),
                 user.isMustChangePassword()
