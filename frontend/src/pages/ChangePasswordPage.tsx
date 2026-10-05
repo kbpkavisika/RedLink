@@ -33,8 +33,8 @@ const schema = z
 type ChangePasswordForm = z.infer<typeof schema>;
 
 /**
- * Any signed-in user can change their password here. Users with a temporary password (set by an admin
- * or the first-admin seeder) are sent here by RequireAuth and can't leave until they choose a new one.
+ * Any signed-in user can change their password here. Users with a temporary password (the first one an admin
+ * gave a new staff member, or the first-admin seeder's) are sent here by RequireAuth and can't leave until they choose a new one.
  */
 export function ChangePasswordPage() {
   const { user, refreshUser, logout } = useAuth();

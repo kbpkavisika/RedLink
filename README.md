@@ -42,7 +42,7 @@ Three roles, each with its own view of the system.
 
 | Role | Can do |
 |---|---|
-| **Admin** | Approve or reject hospital registrations (with a reason), manage users, add staff to a hospital, reset a user's password, view all requests |
+| **Admin** | Approve or reject hospital registrations (with a reason), manage users, add staff to a hospital, view all requests. Admins can't see or change anyone's password |
 | **Hospital staff** | Register their hospital, create blood requests, view matched donors, track responses (including withdrawals), mark requests fulfilled or cancelled |
 | **Donor** | Manage profile and availability, view incoming requests, accept or decline, withdraw after accepting, see donation history |
 
@@ -57,7 +57,7 @@ Every user can also change their own password.
 5. When a request is posted, the system notifies the **top-ranked matches**: `units needed × urgency multiplier`, capped at 25. If there are fewer matches than that, all of them are notified.
 6. Registering a hospital also creates its **first staff account**. The admin adds any further staff.
 7. The **first admin is created automatically** at startup from environment variables. Nobody can register themselves as an admin.
-8. **Password reset by email is not in v1.** An admin sets a temporary password, and the user changes it after logging in.
+8. **Nobody can see or change another user's password, admins included.** Password reset by email isn't in v1, so a user who forgets their password can't recover it yet (see Roadmap: Later).
 
 ---
 
@@ -115,7 +115,7 @@ Further staff accounts are created by the admin in **Users → Add staff user** 
 - **Registration** only creates `DONOR` or `HOSPITAL_STAFF` users. Any `role` sent in the request body is ignored. New users are signed in straight away.
 - **Donors** must be 18 to 60 years old when they register.
 - **Emails** are trimmed and lowercased everywhere, so `Kamal@Mail.lk` and `kamal@mail.lk` are the same account.
-- **Forgotten password (v1):** the "Forgot password?" link tells the user to contact the admin. The admin sets a temporary password, and `must_change_password` makes the user choose a new one at their next login.
+- **Forgotten password (v1):** the "Forgot password?" page explains that reset by email isn't available yet and that nobody, including admins, can see or change a password. The only temporary passwords are the first ones: the startup admin's, and the one an admin gives a new staff member; must_change_password makes them choose their own at first sign-in.
 
 See [Authentication](#authentication) for how tokens and roles work.
 
@@ -421,7 +421,7 @@ Every data view shows one of six states, all from `StateView`:
 
 | Path | Who |
 |---|---|
-| `/` | Everyone: the home page. Visitors see Sign in / Become a donor / Register a hospital; signed-in users see Go to dashboard |
+| `/` | Everyone: the home page. Visitors see Sign in / Become a donor / Register a hospital; signed-in users see **Dashboard** in the hero and in the profile menu |
 | `/login`, `/register/donor`, `/register/hospital`, `/forgot-password` | Public (signed-in users are sent home) |
 | `/hospital`, `/hospital/requests`, `/hospital/requests/new`, `/hospital/requests/:id` | Hospital staff (approved hospital; others see its approval progress) |
 | `/donor`, `/donor/requests`, `/donor/history`, `/donor/profile` | Donors |
@@ -541,7 +541,7 @@ erDiagram
 | `role` | varchar | | `ADMIN`, `HOSPITAL_STAFF` or `DONOR` |
 | `hospital_id` | bigint | 🔗 hospitals | Only set for hospital staff |
 | `enabled` | boolean | | `false` blocks login |
-| `must_change_password` | boolean | | `true` after an admin sets a temporary password; the user must choose a new one at next login |
+| `must_change_password` | boolean | | `true` for a first password someone else chose (new staff, the startup admin); the user must choose their own at next login |
 | `created_at` | timestamp | | When the account was created |
 
 #### 🏥 hospitals
@@ -871,7 +871,6 @@ Start the backend first (step 4). All endpoints are under `http://localhost:8080
 | `PATCH` | `/api/admin/hospitals/{id}/status` | Admin | `{"status":"APPROVED"}` or `{"status":"REJECTED","reason":"…"}` (reason required, max 500). Only `PENDING` hospitals: a decision is final (`409`) |
 | `GET` | `/api/admin/users?role=&q=` | Admin | Users newest first (max 200); optional role, and `q` matching part of the name or email |
 | `POST` | `/api/admin/users` | Admin | Add `HOSPITAL_STAFF` to an approved hospital with a temporary password; `201` |
-| `PATCH` | `/api/admin/users/{id}/password` | Admin | Set a temporary password (not your own); the user must change it at next sign-in |
 | `GET` | `/api/admin/requests` | Admin | Every hospital's requests, newest first (the newest 500), each with reply and donation counts. Read-only |
 | `GET` | `/api/admin/requests/{id}` | Admin | One request, read-only: hospital contact, notified count, every reply, and who donated |
 | `GET` | `/api/requests` | Hospital | The dashboard numbers (`open`, `criticalOpen`, `fulfilledLast30Days`, `donorsComing`) and every request of your hospital, newest first, with `coming` / `withdrew` / `declined` / `donated` counts |
@@ -1005,7 +1004,7 @@ cd backend
 | `AuthFlowIntegrationTest` | Registration, login, `/me`, password change and role rules through the whole app with real tokens | ✅ |
 | `RegistrationRollbackTest` | A failure halfway through hospital registration leaves nothing in the database | ✅ |
 | `AdminHospitalIntegrationTest` | The approval queue, hospital details, approve and reject (reason required, decision final), and 403 for non-admins | ✅ |
-| `AdminUserIntegrationTest` | User search and role filter, adding staff (approved hospitals only, unique email), temporary passwords that must be changed | ✅ |
+| `AdminUserIntegrationTest` | User search and role filter, adding staff (approved hospitals only, unique email), a first password that must be changed, and no way for an admin to change anyone's password | ✅ |
 | `JwtServiceTest` | Token contents and lifetime; expired, forged and wrong-issuer tokens are rejected; BCrypt hashing | ❌ |
 | `SecurityRulesTest` | The role rules for `/api/requests`: staff manage requests, donors respond, everyone else gets 403 | ❌ |
 | `CurrentUserTest` | Reading the user from the token; deleted accounts → 401, disabled → 403 | ❌ |
@@ -1155,7 +1154,7 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Change own password (API)
 - [x] Frontend sign-in, registration and change-password pages, and the hospital approval screen
 - [x] Admin approval of hospitals, with rejection reason
-- [x] Admin user management: search users, add staff users, set temporary passwords
+- [x] Admin user management: search users, add staff users (admins can't change anyone's password)
 - [x] Blood requests and the matching engine (post, ranked matches with filters, request page)
 - [x] Configurable notification count (units × urgency multiplier, capped)
 - [x] Donor side: profile, availability, eligibility ring, incoming requests, accept / decline / withdraw, and replies on the hospital's request page

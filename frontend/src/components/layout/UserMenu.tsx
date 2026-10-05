@@ -1,9 +1,9 @@
 import clsx from 'clsx';
-import { ChevronDown, KeyRound, LogOut } from 'lucide-react';
+import { ChevronDown, KeyRound, LayoutDashboard, LogOut } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
-import { roleLabel } from '../../lib/roles';
+import { homePathFor, roleLabel } from '../../lib/roles';
 
 function initials(name: string): string {
   return name
@@ -70,6 +70,10 @@ export function UserMenu() {
             <p className="mt-1 text-caption text-text-subtle">{roleLabel(user.role)}</p>
           </div>
           <div className="pt-1.5">
+            <Link to={homePathFor(user.role)} className={itemClass} onClick={() => setOpen(false)}>
+              <LayoutDashboard size={16} aria-hidden="true" />
+              Dashboard
+            </Link>
             <Link to="/change-password" className={itemClass} onClick={() => setOpen(false)}>
               <KeyRound size={16} aria-hidden="true" />
               Change password

@@ -1,6 +1,7 @@
 import { ShieldCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { BackButton } from './BackButton';
 
 /**
  * Sign-in and registration (design.md §6.1): a 640px dark hero on the left and the form column on the right.
@@ -38,9 +39,12 @@ export function AuthLayout({ children }: { children: ReactNode }) {
 
       <main className="flex items-center justify-center px-4 py-10 sm:px-8">
         <div className="flex w-full max-w-[400px] flex-col gap-8">
-          <Link to="/" aria-label="RedLink home" className="self-start lg:hidden">
-            <img src="/brand/redlink-logo.svg" alt="RedLink" className="h-8" />
-          </Link>
+          <div className="-mb-4 flex items-center gap-2">
+            <BackButton fallback="/" className="-ml-2.5" />
+            <Link to="/" aria-label="RedLink home" className="lg:hidden">
+              <img src="/brand/redlink-logo.svg" alt="RedLink" className="h-8" />
+            </Link>
+          </div>
           {children}
         </div>
       </main>

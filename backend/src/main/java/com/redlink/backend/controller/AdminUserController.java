@@ -1,7 +1,6 @@
 package com.redlink.backend.controller;
 
 import com.redlink.backend.dto.user.AddStaffRequest;
-import com.redlink.backend.dto.user.SetTemporaryPasswordRequest;
 import com.redlink.backend.dto.user.UserSummary;
 import com.redlink.backend.model.enums.Role;
 import com.redlink.backend.service.UserAdminService;
@@ -12,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 // "Manage users" for admins. ADMIN only: SecurityConfig guards /api/admin/**.
+// There is deliberately no endpoint for changing another user's password.
 @RestController
 @RequestMapping("/api/admin/users")
 public class AdminUserController {
@@ -34,10 +34,5 @@ public class AdminUserController {
     @ResponseStatus(HttpStatus.CREATED)
     public UserSummary addStaff(@Valid @RequestBody AddStaffRequest body) {
         return userAdminService.addStaff(body);
-    }
-
-    @PatchMapping("/{id}/password")
-    public UserSummary setTemporaryPassword(@PathVariable Long id, @Valid @RequestBody SetTemporaryPasswordRequest body) {
-        return userAdminService.setTemporaryPassword(id, body);
     }
 }

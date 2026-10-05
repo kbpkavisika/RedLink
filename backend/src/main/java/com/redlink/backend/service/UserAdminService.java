@@ -1,18 +1,15 @@
 package com.redlink.backend.service;
 
 import com.redlink.backend.dto.user.AddStaffRequest;
-import com.redlink.backend.dto.user.SetTemporaryPasswordRequest;
 import com.redlink.backend.dto.user.UserSummary;
 import com.redlink.backend.exception.BadRequestException;
 import com.redlink.backend.exception.ConflictException;
-import com.redlink.backend.exception.NotFoundException;
 import com.redlink.backend.model.Hospital;
 import com.redlink.backend.model.User;
 import com.redlink.backend.model.enums.HospitalStatus;
 import com.redlink.backend.model.enums.Role;
 import com.redlink.backend.repository.HospitalRepository;
 import com.redlink.backend.repository.UserRepository;
-import com.redlink.backend.security.CurrentUser;
 import org.springframework.data.domain.Limit;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,10 +19,9 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * The admin's "Manage users" (A5) and the two decisions it carries out:
- *   decision 3: further hospital staff are added by the admin
- *   decision 5: no email reset in v1; the admin sets a temporary password instead
- * Both give the user a temporary password they must replace at their next sign-in (must_change_password).
+ * The admin's "Manage users" (A5): search users, and add hospital staff (decision 3) with a first password
+ * they must replace at their first sign-in (must_change_password).
+ * Admins can't read, change or reset anyone's password: once an account exists, only its owner changes it.
  */
 @Service
 @Transactional(readOnly = true)
@@ -37,14 +33,12 @@ public class UserAdminService {
     private final UserRepository userRepository;
     private final HospitalRepository hospitalRepository;
     private final PasswordEncoder passwordEncoder;
-    private final CurrentUser currentUser;
 
     public UserAdminService(UserRepository userRepository, HospitalRepository hospitalRepository,
-                            PasswordEncoder passwordEncoder, CurrentUser currentUser) {
+                            PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.hospitalRepository = hospitalRepository;
         this.passwordEncoder = passwordEncoder;
-        this.currentUser = currentUser;
     }
 
     // role null = every role; q matches part of the name or email, ignoring case
@@ -79,19 +73,6 @@ public class UserAdminService {
         userRepository.saveAndFlush(user); // sets createdAt for the response
 
         return UserSummary.from(user);
-    }
-
-    @Transactional
-    public UserSummary setTemporaryPassword(Long id, SetTemporaryPasswordRequest request) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("User " + id + " was not found."));
-        if (user.getId().equals(currentUser.id())) {
-            throw new BadRequestException("Use Change password to change your own password.");
-        }
-
-        user.setPasswordHash(passwordEncoder.encode(request.temporaryPassword()));
-        user.setMustChangePassword(true);
-        return UserSummary.from(user); // saved when the transaction commits
     }
 
     // "  Kamal " → "%kamal%"; % and _ typed by the admin are matched literally

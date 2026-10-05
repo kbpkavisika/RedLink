@@ -21,7 +21,6 @@ import { formatInstant } from '../../lib/format';
 import { roleLabel } from '../../lib/roles';
 import type { Role, UserSummary } from '../../types';
 import { AddStaffPanel } from './AddStaffPanel';
-import { TemporaryPasswordPanel } from './TemporaryPasswordPanel';
 
 type RoleTab = Role | 'ALL';
 const ROLE_OPTIONS: SegmentOption<RoleTab>[] = [
@@ -33,8 +32,6 @@ const ROLE_OPTIONS: SegmentOption<RoleTab>[] = [
 
 // The API returns at most this many (backend: UserAdminService.MAX_RESULTS)
 const MAX_RESULTS = 200;
-
-type SidePanel = { kind: 'add' } | { kind: 'password'; user: UserSummary } | null;
 
 const FILTERS = ['q', 'role', 'status'] as const;
 
@@ -54,8 +51,8 @@ function parseRole(value: string | null): RoleTab {
 }
 
 /**
- * /admin/users (A5): search everyone by name or email, filter by role, add staff to a hospital,
- * and set a temporary password for someone who has forgotten theirs.
+ * /admin/users (A5): search everyone by name or email, filter by role, and add staff to a hospital.
+ * Admins can't see or change anyone's password: only the account's owner can.
  * The role filter and search text live in the URL (?role=DONOR&q=kamal).
  */
 export function UsersPage() {
@@ -63,7 +60,7 @@ export function UsersPage() {
   const filters = useUrlFilters(FILTERS);
   const role = parseRole(filters.values.role);
   const { q, status } = filters.values;
-  const [panel, setPanel] = useState<SidePanel>(null);
+  const [adding, setAdding] = useState(false);
 
   // Name/email search and role run on the server (the list is capped at the newest 200); status filters what came back
   const { data: users, isPending, isError, error, refetch, isRefetching, isFetching } = useUserSearch({
@@ -109,23 +106,6 @@ export function UsersPage() {
       header: 'Joined',
       cell: (user) => <span className="whitespace-nowrap">{formatInstant(user.createdAt)}</span>,
     },
-    {
-      key: 'action',
-      header: <span className="sr-only">Action</span>,
-      align: 'right',
-      // Admins change their own password on /change-password instead
-      cell: (user) =>
-        user.id !== me?.id && (
-          <Button
-            variant="text"
-            size="sm"
-            aria-label={`Set a temporary password for ${user.fullName}`}
-            onClick={() => setPanel({ kind: 'password', user })}
-          >
-            Reset password
-          </Button>
-        ),
-    },
   ];
 
   return (
@@ -137,12 +117,12 @@ export function UsersPage() {
           value={role}
           onChange={(value) => filters.set('role', value === 'ALL' ? null : value)}
         />
-        <Button leftIcon={<UserPlus size={16} aria-hidden="true" />} onClick={() => setPanel({ kind: 'add' })}>
+        <Button leftIcon={<UserPlus size={16} aria-hidden="true" />} onClick={() => setAdding(true)}>
           Add staff user
         </Button>
       </div>
 
-      <div className={panel ? 'grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_440px]' : undefined}>
+      <div className={adding ? 'grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_440px]' : undefined}>
         <Panel
           title="Users"
           actions={
@@ -207,7 +187,6 @@ export function UsersPage() {
                 rows={rows}
                 rowKey={(user) => user.id}
                 columns={columns}
-                isSelected={(user) => panel?.kind === 'password' && panel.user.id === user.id}
               />
               {users.length >= MAX_RESULTS && (
                 <p className="border-t border-border px-5 py-3 text-caption text-text-subtle">
@@ -218,11 +197,7 @@ export function UsersPage() {
           )}
         </Panel>
 
-        {panel?.kind === 'add' && <AddStaffPanel onClose={() => setPanel(null)} />}
-        {panel?.kind === 'password' && (
-          // Keyed by user so switching users starts a fresh form with a new password
-          <TemporaryPasswordPanel key={panel.user.id} user={panel.user} onClose={() => setPanel(null)} />
-        )}
+        {adding && <AddStaffPanel onClose={() => setAdding(false)} />}
       </div>
     </div>
   );

@@ -158,52 +158,33 @@ class AdminUserIntegrationTest {
                         "hospitalId", "fullName", "email", "phone", "temporaryPassword")));
     }
 
-    // ---------- Decision 5: temporary password ----------
+    // ---------- Admins can't change anyone's password ----------
 
     @Test
-    void temporaryPasswordReplacesTheOldOneAndMustBeChanged() throws Exception {
+    void adminsCantChangeAnotherUsersPassword() throws Exception {
         User donor = testData.user("kamal", Role.DONOR);
 
         mvc.perform(patch("/api/admin/users/{id}/password", donor.getId())
-                        .header("Authorization", testData.bearer(admin))
-                        .contentType("application/json").content("""
-                                {"temporaryPassword":"%s"}""".formatted(TEMPORARY)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mustChangePassword").value(true));
-
-        login(donor.getEmail(), TestData.PASSWORD).andExpect(status().isUnauthorized());
-        login(donor.getEmail(), TEMPORARY)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.user.mustChangePassword").value(true));
-    }
-
-    @Test
-    void adminsChangeTheirOwnPasswordElsewhere() throws Exception {
-        mvc.perform(patch("/api/admin/users/{id}/password", admin.getId())
-                        .header("Authorization", testData.bearer(admin))
-                        .contentType("application/json").content("""
-                                {"temporaryPassword":"%s"}""".formatted(TEMPORARY)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Use Change password to change your own password."));
-    }
-
-    @Test
-    void unknownUserIs404AndShortPasswordIs400() throws Exception {
-        mvc.perform(patch("/api/admin/users/{id}/password", Long.MAX_VALUE)
                         .header("Authorization", testData.bearer(admin))
                         .contentType("application/json").content("""
                                 {"temporaryPassword":"%s"}""".formatted(TEMPORARY)))
                 .andExpect(status().isNotFound());
 
-        User donor = testData.user("kamal", Role.DONOR);
-        mvc.perform(patch("/api/admin/users/{id}/password", donor.getId())
-                        .header("Authorization", testData.bearer(admin))
-                        .contentType("application/json").content("""
-                                {"temporaryPassword":"short"}"""))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fieldErrors[0].field").value("temporaryPassword"));
+        // The donor's own password still works, and they aren't forced to change it
+        login(donor.getEmail(), TestData.PASSWORD)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.mustChangePassword").value(false));
     }
 
+    @Test
+    void userListNeverIncludesPasswords() throws Exception {
+        testData.user("kamal", Role.DONOR);
+
+        mvc.perform(get("/api/admin/users").header("Authorization", testData.bearer(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].password").doesNotExist())
+                .andExpect(jsonPath("$[*].passwordHash").doesNotExist());
+    }
     @Test
     void onlyAdminsManageUsers() throws Exception {
         User staff = testData.staff(approved);

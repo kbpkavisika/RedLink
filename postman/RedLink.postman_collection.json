@@ -423,28 +423,6 @@
             },
             "url": { "raw": "{{baseUrl}}/admin/users", "host": ["{{baseUrl}}"], "path": ["admin", "users"] }
           }
-        },
-        {
-          "name": "Set temporary password",
-          "event": [
-            { "listen": "test", "script": { "type": "text/javascript", "exec": [
-              "pm.test(\"Must change it\", () => {",
-              "  pm.response.to.have.status(200);",
-              "  pm.expect(pm.response.json().mustChangePassword).to.eql(true);",
-              "});"
-            ] } }
-          ],
-          "request": {
-            "description": "For {{userId}}. Their old password stops working; they must choose a new one at their next sign-in. Not allowed on your own account (400).",
-            "method": "PATCH",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"temporaryPassword\": \"Temp-Pass-2026\"\n}",
-              "options": { "raw": { "language": "json" } }
-            },
-            "url": { "raw": "{{baseUrl}}/admin/users/{{userId}}/password", "host": ["{{baseUrl}}"], "path": ["admin", "users", "{{userId}}", "password"] }
-          }
         }
       ]
     },

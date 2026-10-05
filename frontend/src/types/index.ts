@@ -100,10 +100,6 @@ export interface AddStaffRequest {
   temporaryPassword: string; // 8–72 characters; must be changed at first sign-in
 }
 
-export interface SetTemporaryPasswordRequest {
-  temporaryPassword: string;
-}
-
 // ---- Auth (backend: dto/auth) ----
 
 export interface CurrentUser {
