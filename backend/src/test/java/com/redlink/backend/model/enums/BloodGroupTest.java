@@ -89,6 +89,18 @@ class BloodGroupTest {
     }
 
     @Test
+    void recipientsAreTheReverseOfCompatibleDonors() {
+        assertThat(BloodGroup.O_NEG.compatibleRecipients()).containsExactlyInAnyOrder(BloodGroup.values());
+        assertThat(BloodGroup.AB_POS.compatibleRecipients()).containsExactly(BloodGroup.AB_POS);
+        for (BloodGroup donor : BloodGroup.values()) {
+            for (BloodGroup recipient : BloodGroup.values()) {
+                assertThat(donor.compatibleRecipients().contains(recipient))
+                        .isEqualTo(recipient.compatibleDonors().contains(donor));
+            }
+        }
+    }
+
+    @Test
     void rhPositiveNeverGivesToRhNegative() {
         assertThat(BloodGroup.O_POS.canDonateTo(BloodGroup.AB_NEG)).isFalse();
         assertThat(BloodGroup.A_POS.canDonateTo(BloodGroup.A_NEG)).isFalse();
