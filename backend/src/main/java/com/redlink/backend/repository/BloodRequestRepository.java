@@ -35,6 +35,13 @@ public interface BloodRequestRepository extends JpaRepository<BloodRequest, Long
     @Query("select r from BloodRequest r where r.status = :status and r.neededBy <= :now order by r.id")
     List<BloodRequest> findOverdueForUpdate(RequestStatus status, Instant now);
 
+    // A hospital's requests, newest first, with who posted each (idx_requests_hospital)
+    @Query("""
+            select r from BloodRequest r join fetch r.createdBy join fetch r.hospital
+            where r.hospital.id = :hospitalId
+            order by r.createdAt desc, r.id desc""")
+    List<BloodRequest> findByHospitalNewestFirst(Long hospitalId);
+
     // A donor's incoming requests (D5): still OPEN, not yet past their deadline, for a group the donor can give to
     @Query("""
             select r from BloodRequest r join fetch r.hospital

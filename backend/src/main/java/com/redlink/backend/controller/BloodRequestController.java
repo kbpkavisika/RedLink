@@ -1,6 +1,7 @@
 package com.redlink.backend.controller;
 
 import com.redlink.backend.dto.request.CreateBloodRequestRequest;
+import com.redlink.backend.dto.request.HospitalRequestList;
 import com.redlink.backend.dto.request.MatchedDonor;
 import com.redlink.backend.dto.request.PostedRequestResponse;
 import com.redlink.backend.dto.request.RequestOverview;
@@ -31,6 +32,12 @@ public class BloodRequestController {
     @ResponseStatus(HttpStatus.CREATED)
     public PostedRequestResponse create(@Valid @RequestBody CreateBloodRequestRequest body) {
         return bloodRequestService.create(body);
+    }
+
+    // H11: the hospital's requests, newest first, with reply and donation counts and the dashboard numbers
+    @GetMapping
+    public HospitalRequestList list() {
+        return bloodRequestService.list();
     }
 
     @GetMapping("/{id}")

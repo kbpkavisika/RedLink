@@ -21,4 +21,12 @@ public interface DonorResponseRepository extends JpaRepository<DonorResponse, Lo
             select r from DonorResponse r join fetch r.donor d join fetch d.user
             where r.request.id = :requestId""")
     List<DonorResponse> findByRequestIdWithDonor(Long requestId);
+
+    // Replies per request and status, for every request of a hospital (one query for a whole list)
+    @Query("""
+            select new com.redlink.backend.repository.ResponseStatusCount(r.request.id, r.status, count(r))
+            from DonorResponse r
+            where r.request.hospital.id = :hospitalId
+            group by r.request.id, r.status""")
+    List<ResponseStatusCount> countByStatusForHospital(Long hospitalId);
 }
