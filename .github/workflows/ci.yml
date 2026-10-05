@@ -50,6 +50,7 @@ jobs:
           ./mvnw -B verify
 
   frontend:
+    # Keep this name: branch protection on main requires the check by name. It also runs the tests.
     name: Frontend (lint + build)
     runs-on: ubuntu-latest
     defaults:
@@ -72,6 +73,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Test
+        run: npm test
 
       - name: Build
         run: npm run build

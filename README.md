@@ -1074,6 +1074,7 @@ To run only the tests that don't need a database:
 | `npm run build` | Type-check and build for production |
 | `npm run lint` | Run ESLint |
 | `npm run preview` | Preview the production build |
+| `npm test` | Run the frontend tests once (Vitest); `npm run test:watch` re-runs them as you edit |
 
 ### Backend (`backend/`)
 
@@ -1128,12 +1129,12 @@ The workflow in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on e
 | Job | Steps |
 |---|---|
 | **Backend (build + test)** | Starts a temporary PostgreSQL 18 database (`redLink_test`), sets up Java 25, runs `./mvnw verify` (compile + tests) |
-| **Frontend (lint + build)** | Sets up Node.js 24, runs `npm ci`, `npm run lint` and `npm run build` |
+| **Frontend (lint + build)** | Sets up Node.js 24, runs `npm ci`, `npm run lint`, `npm test` and `npm run build` |
 
 Run the same checks locally before pushing:
 
 ```bash
-cd frontend && npm run lint && npm run build
+cd frontend && npm run lint && npm test && npm run build
 cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 ```
 
@@ -1162,7 +1163,7 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Notifications: posted, accepted, withdrawn, fulfilled, cancelled and hospital decisions, with a bell and a notifications page
 - [x] Requests expire automatically after their needed-by time (background job)
 - [x] Hospital dashboard and requests table; admin view of every request (read-only)
-- [ ] Frontend component tests (Vitest + Testing Library)
+- [x] Frontend tests (Vitest + Testing Library): helpers, route guards, sign-in, screen states; run in CI
 - [x] GitHub Actions CI (backend tests + frontend lint/build on every pull request)
 - [x] Branch protection on `main` (pull request + passing CI required)
 - [ ] Dockerize the backend
