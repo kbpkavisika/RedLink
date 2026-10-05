@@ -8,6 +8,7 @@ import { AppShell } from './components/layout/AppShell';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
 import { DonorsPage } from './pages/admin/DonorsPage';
+import { DonorHomePage } from './pages/donor/DonorHomePage';
 import { HospitalsPage } from './pages/admin/HospitalsPage';
 import { UsersPage } from './pages/admin/UsersPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
@@ -67,7 +68,7 @@ export default function App() {
             <Route element={<RequireAuth role="DONOR" />}>
               <Route
                 path="/donor"
-                element={<ComingSoonPage title="Your home" description="Eligibility, availability and requests that need you." />}
+                element={<DonorHomePage />}
               />
               <Route
                 path="/donor/requests"
