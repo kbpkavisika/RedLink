@@ -5,6 +5,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
 import { Button, LinkButton } from '../ui';
 import { navigation, pageTitleFor } from './navigation';
+import { NotificationBell } from './NotificationBell';
 import { UserMenu } from './UserMenu';
 
 /**
@@ -101,6 +102,7 @@ export function AppShell() {
             </LinkButton>
           )}
 
+          <NotificationBell />
           <UserMenu />
         </header>
 

@@ -299,3 +299,20 @@ export interface MatchedDonor {
   exactMatch: boolean; // same blood group as requested (otherwise a compatible substitute)
   sameCity: boolean; // same city as the request
 }
+
+// ---- Notifications (backend: dto/notification) ----
+
+// GET /api/notifications: the latest 100, newest first
+export interface NotificationFeed {
+  unreadCount: number; // all unread, even older than the items returned
+  items: NotificationItem[];
+}
+
+export interface NotificationItem {
+  id: number;
+  message: string;
+  read: boolean;
+  createdAt: string; // ISO timestamp
+  requestId: number | null; // the request it's about; null for e.g. a hospital decision
+  reference: string | null; // "RQ-12"
+}
