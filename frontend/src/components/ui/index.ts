@@ -4,6 +4,7 @@ export { BloodGroupBadge } from './BloodGroupBadge';
 export { BloodGroupPicker } from './BloodGroupPicker';
 export { Button } from './Button';
 export { Chip } from './Chip';
+export { EligibilityRing } from './EligibilityRing';
 export { FormAlert } from './FormAlert';
 export { HospitalStatusBadge } from './HospitalStatusBadge';
 export { Input } from './Input';

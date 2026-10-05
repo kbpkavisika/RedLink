@@ -6,6 +6,7 @@ import com.redlink.backend.dto.request.CreateBloodRequestRequest;
 import com.redlink.backend.dto.request.MatchedDonor;
 import com.redlink.backend.dto.request.PostedRequestResponse;
 import com.redlink.backend.dto.request.RequestOverview;
+import com.redlink.backend.dto.request.RequestResponse;
 import com.redlink.backend.exception.BadRequestException;
 import com.redlink.backend.exception.ForbiddenException;
 import com.redlink.backend.exception.NotFoundException;
@@ -17,8 +18,10 @@ import com.redlink.backend.model.User;
 import com.redlink.backend.model.enums.BloodGroup;
 import com.redlink.backend.model.enums.HospitalStatus;
 import com.redlink.backend.model.enums.RequestStatus;
+import com.redlink.backend.model.enums.ResponseStatus;
 import com.redlink.backend.model.enums.Role;
 import com.redlink.backend.repository.BloodRequestRepository;
+import com.redlink.backend.repository.DonorResponseRepository;
 import com.redlink.backend.repository.NotificationRepository;
 import com.redlink.backend.security.CurrentUser;
 import com.redlink.backend.util.Cities;
@@ -27,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -37,7 +41,8 @@ import java.util.List;
  *        ▼
  *   save request (OPEN) → rank matches → notify the top N → 201 with counts
  *
- * Only donors are notified now; hospital-side notifications come with donor responses.
+ * Staff also see their request's ranked matches (H5, H12) and donors' replies (H7).
+ * Only donors are notified now; hospital-side notifications come with the notifications phase.
  */
 @Service
 @Transactional(readOnly = true)
@@ -45,16 +50,19 @@ public class BloodRequestService {
 
     private final BloodRequestRepository bloodRequestRepository;
     private final NotificationRepository notificationRepository;
+    private final DonorResponseRepository donorResponseRepository;
     private final MatchingService matchingService;
     private final MatchingProperties matchingProperties;
     private final CurrentUser currentUser;
     private final Clock clock;
 
     public BloodRequestService(BloodRequestRepository bloodRequestRepository,
-                               NotificationRepository notificationRepository, MatchingService matchingService,
+                               NotificationRepository notificationRepository, DonorResponseRepository donorResponseRepository,
+                               MatchingService matchingService,
                                MatchingProperties matchingProperties, CurrentUser currentUser, Clock clock) {
         this.bloodRequestRepository = bloodRequestRepository;
         this.notificationRepository = notificationRepository;
+        this.donorResponseRepository = donorResponseRepository;
         this.matchingService = matchingService;
         this.matchingProperties = matchingProperties;
         this.currentUser = currentUser;
@@ -114,6 +122,23 @@ public class BloodRequestService {
                 .filter(match -> !filterCity || Cities.same(match.city(), city))
                 .toList();
     }
+
+    /**
+     * H7: every donor's reply to this request. Accepted first (who is coming), then withdrawn (who was coming),
+     * then declined; within each, the earliest reply first.
+     */
+    public List<RequestResponse> findResponses(Long id) {
+        ownRequest(id);
+        return donorResponseRepository.findByRequestIdWithDonor(id).stream()
+                .map(RequestResponse::from)
+                .sorted(Comparator.comparingInt((RequestResponse response) -> RESPONSE_ORDER.indexOf(response.status()))
+                        .thenComparing(RequestResponse::respondedAt)
+                        .thenComparing(RequestResponse::donorId))
+                .toList();
+    }
+
+    private static final List<ResponseStatus> RESPONSE_ORDER =
+            List.of(ResponseStatus.ACCEPTED, ResponseStatus.WITHDRAWN, ResponseStatus.DECLINED);
 
     // Staff only see their own hospital's requests; anyone else's is "not found", so ids reveal nothing
     private BloodRequest ownRequest(Long id) {

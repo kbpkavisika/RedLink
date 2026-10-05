@@ -1,11 +1,12 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createRequest, getMatches, getRequest, requestKeys, type MatchFilters } from '../api/requests';
+import { createRequest, getMatches, getRequest, getResponses, requestKeys, type MatchFilters } from '../api/requests';
 import type {
   ApiError,
   CreateBloodRequestRequest,
   MatchedDonor,
   PostedRequestResponse,
   RequestOverview,
+  RequestResponse,
 } from '../types';
 
 export function useCreateRequest() {
@@ -32,5 +33,14 @@ export function useMatches(id: number, filters: MatchFilters) {
     queryFn: () => getMatches(id, filters),
     // Keep the current list on screen while a new filter loads
     placeholderData: keepPreviousData,
+  });
+}
+
+// Replies arrive while staff watch the page, so check again every 30 seconds while it's open
+export function useResponses(id: number) {
+  return useQuery<RequestResponse[], ApiError>({
+    queryKey: requestKeys.responses(id),
+    queryFn: () => getResponses(id),
+    refetchInterval: 30_000,
   });
 }

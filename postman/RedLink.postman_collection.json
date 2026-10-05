@@ -17,7 +17,9 @@
     { "key": "hospitalId", "value": "1", "description": "Set by Pending queue (oldest pending hospital) or All hospitals" },
     { "key": "approvedHospitalId", "value": "1", "description": "Set by All hospitals (first approved hospital); used by Add staff user" },
     { "key": "userId", "value": "1", "description": "Set by Search users (first result) and Add staff user" },
-    { "key": "requestId", "value": "1", "description": "Set by Post a request" }
+    { "key": "requestId", "value": "1", "description": "Set by Post a request" },
+    { "key": "acceptRequestId", "value": "1", "description": "Set by Incoming requests (first unanswered)" },
+    { "key": "declineRequestId", "value": "1", "description": "Set by Incoming requests (second unanswered)" }
   ],
   "item": [
     {
@@ -575,7 +577,167 @@
             "url": { "raw": "{{baseUrl}}/requests", "host": ["{{baseUrl}}"], "path": ["requests"] }
           }
         }
+,
+        {
+          "name": "Donor replies",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "const order = [\"ACCEPTED\", \"WITHDRAWN\", \"DECLINED\"];",
+              "const statuses = pm.response.json().map(r => order.indexOf(r.status));",
+              "pm.test(\"Accepted first, then withdrawn, then declined\", () => pm.expect(statuses).to.eql([...statuses].sort((a, b) => a - b)));"
+            ] } }
+          ],
+          "request": {
+            "description": "Sign in as approved staff again first (the donor folder signs in as Kamal).",
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/requests/{{requestId}}/responses", "host": ["{{baseUrl}}"], "path": ["requests", "{{requestId}}", "responses"] }
+          }
+        }
       ]
+    },
+    {
+      "name": "7. Donor",
+      "description": "Sign in with Login as donor (1. Sign in) first. Post a request in 6 so there is something to reply to.",
+      "item": [
+        {
+          "name": "My profile and eligibility",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "const me = pm.response.json();",
+              "console.log(me.eligible ? \"Eligible to donate\" : `Eligible again on ${me.nextEligibleDate}`);"
+            ] } }
+          ],
+          "request": {
+            "description": "Run Login as donor (1. Sign in) first.",
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/donor/me", "host": ["{{baseUrl}}"], "path": ["donor", "me"] }
+          }
+        },
+        {
+          "name": "Update my profile",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Phone tidied\", () => pm.expect(pm.response.json().phone).to.eql(\"0771234567\"));"
+            ] } }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Kamal Perera\",\n  \"phone\": \"077 123 4567\",\n  \"city\": \"Colombo\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/donor/me", "host": ["{{baseUrl}}"], "path": ["donor", "me"] }
+          }
+        },
+        {
+          "name": "Pause alerts",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Paused\", () => pm.expect(pm.response.json().available).to.be.false);"
+            ] } }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"available\": false\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/donor/me/availability", "host": ["{{baseUrl}}"], "path": ["donor", "me", "availability"] }
+          }
+        },
+        {
+          "name": "Resume alerts",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Available\", () => pm.expect(pm.response.json().available).to.be.true);"
+            ] } }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"available\": true\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/donor/me/availability", "host": ["{{baseUrl}}"], "path": ["donor", "me", "availability"] }
+          }
+        },
+        {
+          "name": "Incoming requests",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "const waiting = pm.response.json().filter(r => r.myResponse === null);",
+              "if (waiting[0]) pm.collectionVariables.set(\"acceptRequestId\", waiting[0].requestId);",
+              "if (waiting[1]) pm.collectionVariables.set(\"declineRequestId\", waiting[1].requestId);",
+              "console.log(`${waiting.length} requests waiting for a reply.`);"
+            ] } }
+          ],
+          "request": {
+            "description": "Saves the first two unanswered requests for Accept and Decline.",
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/donor/requests", "host": ["{{baseUrl}}"], "path": ["donor", "requests"] }
+          }
+        },
+        {
+          "name": "Accept (I can donate)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Created\", () => pm.response.to.have.status(201));",
+              "pm.test(\"Accepted\", () => pm.expect(pm.response.json().myResponse).to.eql(\"ACCEPTED\"));"
+            ] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"ACCEPTED\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/requests/{{acceptRequestId}}/responses", "host": ["{{baseUrl}}"], "path": ["requests", "{{acceptRequestId}}", "responses"] }
+          }
+        },
+        {
+          "name": "Reply again (409)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 409\", () => pm.response.to.have.status(409));"
+            ] } }
+          ],
+          "request": {
+            "description": "A donor replies to a request once.",
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"DECLINED\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/requests/{{acceptRequestId}}/responses", "host": ["{{baseUrl}}"], "path": ["requests", "{{acceptRequestId}}", "responses"] }
+          }
+        },
+        {
+          "name": "Withdraw (I can't make it)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Withdrawn\", () => pm.expect(pm.response.json().myResponse).to.eql(\"WITHDRAWN\"));"
+            ] } }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"WITHDRAWN\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/requests/{{acceptRequestId}}/responses/me", "host": ["{{baseUrl}}"], "path": ["requests", "{{acceptRequestId}}", "responses", "me"] }
+          }
+        },
+        {
+          "name": "Decline",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test(\"Created\", () => pm.response.to.have.status(201));"
+            ] } }
+          ],
+          "request": {
+            "description": "Needs a second waiting request: post two in 6 first.",
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"DECLINED\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/requests/{{declineRequestId}}/responses", "host": ["{{baseUrl}}"], "path": ["requests", "{{declineRequestId}}", "responses"] }
+          }
+        }      ]
     }
   ]
 }

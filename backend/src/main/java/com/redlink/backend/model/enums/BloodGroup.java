@@ -54,6 +54,17 @@ public enum BloodGroup {
         return donors;
     }
 
+    // The other direction: every recipient group this donor can give to (O− → all eight, AB+ → AB+ only)
+    public Set<BloodGroup> compatibleRecipients() {
+        Set<BloodGroup> recipients = EnumSet.noneOf(BloodGroup.class);
+        for (BloodGroup recipient : values()) {
+            if (canDonateTo(recipient)) {
+                recipients.add(recipient);
+            }
+        }
+        return recipients;
+    }
+
     @JsonValue
     public String getLabel() {
         return label;

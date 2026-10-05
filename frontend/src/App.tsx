@@ -8,6 +8,9 @@ import { AppShell } from './components/layout/AppShell';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
 import { DonorsPage } from './pages/admin/DonorsPage';
+import { DonorHomePage } from './pages/donor/DonorHomePage';
+import { DonorProfilePage } from './pages/donor/DonorProfilePage';
+import { DonorRequestsPage } from './pages/donor/DonorRequestsPage';
 import { HospitalsPage } from './pages/admin/HospitalsPage';
 import { UsersPage } from './pages/admin/UsersPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
@@ -67,11 +70,11 @@ export default function App() {
             <Route element={<RequireAuth role="DONOR" />}>
               <Route
                 path="/donor"
-                element={<ComingSoonPage title="Your home" description="Eligibility, availability and requests that need you." />}
+                element={<DonorHomePage />}
               />
               <Route
                 path="/donor/requests"
-                element={<ComingSoonPage title="Requests" description="Requests matching your blood group." />}
+                element={<DonorRequestsPage />}
               />
               <Route
                 path="/donor/history"
@@ -79,7 +82,7 @@ export default function App() {
               />
               <Route
                 path="/donor/profile"
-                element={<ComingSoonPage title="Your profile" description="Your details and blood group." />}
+                element={<DonorProfilePage />}
               />
             </Route>
 

@@ -19,6 +19,10 @@ public interface DonorRepository extends JpaRepository<Donor, Long> {
     @Query("select d from Donor d join fetch d.user where d.id = :id")
     Optional<Donor> findByIdWithUser(Long id);
 
+    // The signed-in donor's profile (users.id → donors.user_id is unique)
+    @Query("select d from Donor d join fetch d.user u where u.id = :userId")
+    Optional<Donor> findByUserIdWithUser(Long userId);
+
     /**
      * Everyone who may be matched to a request, before ranking (README "Matching engine"):
      * a compatible blood group, available, an enabled account, eligible under the 90-day rule

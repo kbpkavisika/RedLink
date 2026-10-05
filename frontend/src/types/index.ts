@@ -204,6 +204,63 @@ export interface RequestOverview {
   notifiedCount: number;
 }
 
+// ---- Donor self-service (backend: dto/donor) ----
+
+// GET /api/donor/me: the signed-in donor's profile and eligibility
+export interface DonorProfile {
+  id: number;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  bloodGroup: BloodGroup;
+  dateOfBirth: string; // ISO date
+  city: string;
+  available: boolean;
+  lastDonationDate: string | null; // ISO date; null = never donated
+  daysSinceLastDonation: number | null;
+  eligible: boolean;
+  nextEligibleDate: string | null; // ISO date; only while not eligible
+  daysBetweenDonations: number; // 90
+}
+
+// PATCH /api/donor/me
+export interface UpdateDonorProfileRequest {
+  fullName: string;
+  phone: string;
+  city: string;
+}
+
+// One row of GET /api/donor/requests: an open request this donor can give to. Never patient details.
+export interface IncomingRequest {
+  requestId: number;
+  reference: string;
+  bloodGroup: BloodGroup;
+  unitsNeeded: number;
+  urgency: Urgency;
+  city: string;
+  neededBy: string;
+  createdAt: string;
+  hospitalName: string;
+  hospitalAddress: string;
+  hospitalPhone: string;
+  exactMatch: boolean; // the request is for the donor's own group
+  sameCity: boolean; // the request is in the donor's city
+  myResponse: ResponseStatus | null; // null = not answered yet
+  respondedAt: string | null;
+}
+
+// One row of GET /api/requests/{id}/responses (hospital staff), accepted first
+export interface RequestResponse {
+  donorId: number;
+  name: string;
+  phone: string | null;
+  bloodGroup: BloodGroup;
+  city: string;
+  status: ResponseStatus;
+  respondedAt: string;
+  updatedAt: string;
+}
+
 // One row of GET /api/requests/{id}/matches, best match first
 export interface MatchedDonor {
   donorId: number;
