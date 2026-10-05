@@ -1,20 +1,22 @@
 import { RefreshCw, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
 import {
   Badge,
   Button,
-  Input,
+  FilterBar,
+  FilterSelect,
   Panel,
+  SearchInput,
   SegmentedControl,
   StateView,
   Table,
+  type BadgeTone,
   type Column,
   type SegmentOption,
 } from '../../components/ui';
 import { useUserSearch } from '../../hooks/useAdminUsers';
-import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useUrlFilters } from '../../hooks/useUrlFilters';
 import { formatInstant } from '../../lib/format';
 import { roleLabel } from '../../lib/roles';
 import type { Role, UserSummary } from '../../types';
@@ -34,6 +36,19 @@ const MAX_RESULTS = 200;
 
 type SidePanel = { kind: 'add' } | { kind: 'password'; user: UserSummary } | null;
 
+const FILTERS = ['q', 'role', 'status'] as const;
+
+type UserStatus = 'active' | 'temporary' | 'disabled';
+const STATUS: Record<UserStatus, { label: string; tone: BadgeTone }> = {
+  active: { label: 'Active', tone: 'success' },
+  temporary: { label: 'Temporary password', tone: 'warning' },
+  disabled: { label: 'Disabled', tone: 'neutral' },
+};
+
+function statusOf(user: UserSummary): UserStatus {
+  return !user.enabled ? 'disabled' : user.mustChangePassword ? 'temporary' : 'active';
+}
+
 function parseRole(value: string | null): RoleTab {
   return ROLE_OPTIONS.find((option) => option.value === value)?.value ?? 'ALL';
 }
@@ -45,35 +60,17 @@ function parseRole(value: string | null): RoleTab {
  */
 export function UsersPage() {
   const { user: me } = useAuth();
-  const [params, setParams] = useSearchParams();
-  const role = parseRole(params.get('role'));
-  const [query, setQuery] = useState(params.get('q') ?? '');
-  const debouncedQuery = useDebouncedValue(query.trim());
+  const filters = useUrlFilters(FILTERS);
+  const role = parseRole(filters.values.role);
+  const { q, status } = filters.values;
   const [panel, setPanel] = useState<SidePanel>(null);
 
+  // Name/email search and role run on the server (the list is capped at the newest 200); status filters what came back
   const { data: users, isPending, isError, error, refetch, isRefetching, isFetching } = useUserSearch({
     role: role === 'ALL' ? undefined : role,
-    q: debouncedQuery || undefined,
+    q: q || undefined,
   });
-
-  const setParam = (key: string, value: string | null) => {
-    setParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        return next;
-      },
-      { replace: true },
-    );
-  };
-
-  const onSearch = (value: string) => {
-    setQuery(value);
-    setParam('q', value.trim() || null);
-  };
-
-  const filtered = Boolean(debouncedQuery) || role !== 'ALL';
+  const rows = (users ?? []).filter((user) => !status || statusOf(user) === status);
 
   const columns: Column<UserSummary>[] = [
     {
@@ -102,14 +99,10 @@ export function UsersPage() {
     {
       key: 'status',
       header: 'Status',
-      cell: (user) =>
-        !user.enabled ? (
-          <Badge>Disabled</Badge>
-        ) : user.mustChangePassword ? (
-          <Badge tone="warning">Temporary password</Badge>
-        ) : (
-          <Badge tone="success">Active</Badge>
-        ),
+      cell: (user) => {
+        const { label, tone } = STATUS[statusOf(user)];
+        return <Badge tone={tone}>{label}</Badge>;
+      },
     },
     {
       key: 'joined',
@@ -138,22 +131,12 @@ export function UsersPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <Input
-            label="Search"
-            type="search"
-            placeholder="Name or email"
-            className="w-full sm:w-72"
-            value={query}
-            onChange={(event) => onSearch(event.target.value)}
-          />
-          <SegmentedControl
-            label="Filter users by role"
-            options={ROLE_OPTIONS}
-            value={role}
-            onChange={(value) => setParam('role', value === 'ALL' ? null : value)}
-          />
-        </div>
+        <SegmentedControl
+          label="Filter users by role"
+          options={ROLE_OPTIONS}
+          value={role}
+          onChange={(value) => filters.set('role', value === 'ALL' ? null : value)}
+        />
         <Button leftIcon={<UserPlus size={16} aria-hidden="true" />} onClick={() => setPanel({ kind: 'add' })}>
           Add staff user
         </Button>
@@ -165,11 +148,26 @@ export function UsersPage() {
           actions={
             users && (
               <span className="text-label text-text-subtle" aria-live="polite">
-                {isFetching ? 'Searching…' : users.length >= MAX_RESULTS ? `Newest ${MAX_RESULTS}` : `${users.length} found`}
+                {isFetching ? 'Searching…' : users.length >= MAX_RESULTS ? `Newest ${MAX_RESULTS}` : `${rows.length} found`}
               </span>
             )
           }
         >
+          <FilterBar active={filters.active} onClear={filters.clear}>
+            <SearchInput
+              label="Search users"
+              placeholder="Name or email"
+              value={q}
+              onChange={(value) => filters.set('q', value)}
+            />
+            <FilterSelect
+              label="Status"
+              allLabel="Any status"
+              value={status}
+              onChange={(value) => filters.set('status', value)}
+              options={(Object.keys(STATUS) as UserStatus[]).map((key) => ({ value: key, label: STATUS[key].label }))}
+            />
+          </FilterBar>
           {isPending ? (
             <StateView state="loading" />
           ) : isError ? (
@@ -187,20 +185,14 @@ export function UsersPage() {
                 </Button>
               }
             />
-          ) : users.length === 0 ? (
-            filtered ? (
+          ) : rows.length === 0 ? (
+            filters.active ? (
               <StateView
                 state="no-results"
                 title="No users match"
                 description="Check the spelling, or search for part of the name or email."
                 secondaryAction={
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      onSearch('');
-                      setParam('role', null);
-                    }}
-                  >
+                  <Button variant="outline" onClick={filters.clear}>
                     Clear filters
                   </Button>
                 }
@@ -212,7 +204,7 @@ export function UsersPage() {
             <>
               <Table
                 caption="Users"
-                rows={users}
+                rows={rows}
                 rowKey={(user) => user.id}
                 columns={columns}
                 isSelected={(user) => panel?.kind === 'password' && panel.user.id === user.id}

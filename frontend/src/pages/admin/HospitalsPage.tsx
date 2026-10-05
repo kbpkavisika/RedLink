@@ -2,8 +2,11 @@ import { Building2, RefreshCw } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Button,
+  FilterBar,
+  FilterSelect,
   HospitalStatusBadge,
   Panel,
+  SearchInput,
   SegmentedControl,
   StateView,
   Table,
@@ -11,7 +14,9 @@ import {
   type SegmentOption,
 } from '../../components/ui';
 import { useHospitals } from '../../hooks/useAdminHospitals';
+import { useUrlFilters } from '../../hooks/useUrlFilters';
 import { formatInstant } from '../../lib/format';
+import { matchesQuery } from '../../lib/search';
 import type { HospitalStatus, HospitalSummary } from '../../types';
 import { HospitalReviewPanel } from './HospitalReviewPanel';
 
@@ -25,6 +30,8 @@ const EMPTY: Record<Tab, { title: string; description: string }> = {
   REJECTED: { title: 'No rejected hospitals', description: 'Hospitals you reject appear here, with your reason.' },
   ALL: { title: 'No hospitals yet', description: 'Hospitals appear here as soon as they register.' },
 };
+
+const SEARCH_FILTERS = ['q', 'city'] as const;
 
 function parseTab(value: string | null): Tab {
   return TABS.find((tab) => tab === value) ?? 'PENDING';
@@ -51,15 +58,27 @@ export function HospitalsPage() {
     );
   };
 
-  const counts = Object.fromEntries(
-    TABS.map((t) => [t, hospitals?.filter((h) => t === 'ALL' || h.status === t).length]),
-  ) as Record<Tab, number | undefined>;
+  // Search and city narrow every tab, so the counts show where the matches are
+  const filters = useUrlFilters(SEARCH_FILTERS);
+  const { q, city } = filters.values;
+  const cities = [...new Set((hospitals ?? []).map((h) => h.city.trim()))].sort((a, b) => a.localeCompare(b));
+  const searched = (hospitals ?? []).filter(
+    (h) =>
+      matchesQuery(q, h.name, h.registrationNo, h.city) && (!city || h.city.trim().toLowerCase() === city.toLowerCase()),
+  );
+
+  const inTab = (list: HospitalSummary[], t: Tab) => list.filter((h) => t === 'ALL' || h.status === t);
+  const counts = Object.fromEntries(TABS.map((t) => [t, hospitals ? inTab(searched, t).length : undefined])) as Record<
+    Tab,
+    number | undefined
+  >;
 
   const options: SegmentOption<Tab>[] = TABS.map((t) => ({ value: t, label: TAB_LABELS[t], count: counts[t] }));
 
   // The queue is oldest first, so nobody waits longest; other tabs show the newest first (as the API sends them)
-  const rows = (hospitals ?? []).filter((h) => tab === 'ALL' || h.status === tab);
+  const rows = inTab(searched, tab);
   if (tab === 'PENDING') rows.reverse();
+  const tabTotal = inTab(hospitals ?? [], tab).length;
 
   const columns: Column<HospitalSummary>[] = [
     {
@@ -107,6 +126,23 @@ export function HospitalsPage() {
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_440px]">
         <Panel title={tab === 'PENDING' ? 'Waiting for review' : `${TAB_LABELS[tab]} hospitals`}>
+          {hospitals && hospitals.length > 0 && (
+            <FilterBar shown={rows.length} total={tabTotal} active={filters.active} onClear={filters.clear}>
+              <SearchInput
+                label="Search hospitals"
+                placeholder="Name or registration no."
+                value={q}
+                onChange={(value) => filters.set('q', value)}
+              />
+              <FilterSelect
+                label="City"
+                allLabel="All cities"
+                value={city}
+                onChange={(value) => filters.set('city', value)}
+                options={cities.map((c) => ({ value: c, label: c }))}
+              />
+            </FilterBar>
+          )}
           {isPending ? (
             <StateView state="loading" />
           ) : isError ? (
@@ -122,6 +158,28 @@ export function HospitalsPage() {
                 >
                   Try again
                 </Button>
+              }
+            />
+          ) : rows.length === 0 && filters.active ? (
+            <StateView
+              state="no-results"
+              title={`No ${TAB_LABELS[tab].toLowerCase()} hospitals match`}
+              description={
+                tab !== 'ALL' && counts.ALL
+                  ? `${counts.ALL} ${counts.ALL === 1 ? 'hospital matches' : 'hospitals match'} in other tabs.`
+                  : 'Check the spelling, or search for part of the name or registration number.'
+              }
+              secondaryAction={
+                <Button variant="outline" onClick={filters.clear}>
+                  Clear filters
+                </Button>
+              }
+              action={
+                tab !== 'ALL' && counts.ALL ? (
+                  <Button variant="dark" onClick={() => update({ status: 'ALL' })}>
+                    Show all statuses
+                  </Button>
+                ) : undefined
               }
             />
           ) : rows.length === 0 ? (

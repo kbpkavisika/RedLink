@@ -379,6 +379,8 @@ Import from [`src/components/ui`](frontend/src/components/ui/): `import { Button
 | `Input` | Label, hint, error message wired to `aria-describedby`; works with React Hook Form |
 | `Badge`, `Chip`, `UrgencyTag`, `BloodGroupBadge` | Status pills, filter chips, urgency (only Critical is red), blood group tiles shown with a true minus sign (`A−`) |
 | `Panel`, `Table` | The container for all data; a typed table with 56px rows |
+| `FilterBar`, `SearchInput`, `FilterSelect` | The toolbar above every table: search, dropdown filters, "12 of 46" and **Clear filters** (see [Table search and filters](#table-search-and-filters)) |
+| `Select`, `Textarea`, `PasswordInput`, `SegmentedControl` | Form dropdown, multi-line text, password with show/hide, tab-like filter buttons |
 | `Switch`, `StepProgress` | Availability toggle; multi-stage status such as hospital approval |
 | `StateView`, `Skeleton` | The six screen states below |
 
@@ -414,9 +416,49 @@ With `npm run dev`, **http://localhost:5173/dev/components** shows every compone
 
 1. **API function** in `src/api/` (e.g. `getRequests()`), plus query keys.
 2. **Query hook** in `src/hooks/` typed with `ApiError`: `useQuery<BloodRequest[], ApiError>(…)`.
-3. **Page** in `src/pages/<role>/` using `Panel` + `Table` and a `StateView` for loading, error and empty. [`DonorsPage`](frontend/src/pages/admin/DonorsPage.tsx) is the reference.
+3. **Page** in `src/pages/<role>/` using `Panel` + `FilterBar` + `Table` and a `StateView` for loading, error, empty and no results. [`DonorsPage`](frontend/src/pages/admin/DonorsPage.tsx) is the reference.
 4. **Route** in [`App.tsx`](frontend/src/App.tsx) inside the right role group; add a sidebar link in [`navigation.ts`](frontend/src/components/layout/navigation.ts) if it needs one.
 5. **Types** in `src/types/index.ts`, matching the backend DTO exactly.
+
+### Table search and filters
+
+Every table has the same toolbar at the top of its panel:
+
+```
+[🔍 Search…        ]  [Blood group ▾] [City ▾] [Status ▾]      12 of 46 · Clear filters
+```
+
+| Table | Search | Filters |
+|---|---|---|
+| Admin: donors | Name, phone, city | Blood group, city, availability, can donate now / waiting 90 days |
+| Admin: hospitals | Name, registration number, city | Status tabs, city |
+| Admin: users | Name, email (on the server) | Role tabs, status (active, temporary password, disabled) |
+| Request page: donor replies | Name, phone, city | Reply (coming, can't make it, declined) |
+| Request page: ranked matches | Name, phone, city | Compatible blood group, the request's city only |
+
+How it behaves:
+
+- **Search** matches every word anywhere in the row, ignoring case: `kamal colombo` finds Kamal Perera in Colombo. Numbers ignore spaces and dashes, so `077 123` finds `0771234567`. The box waits until typing pauses (300 ms); ✕ or **Escape** clears it.
+- **Filters and search live in the URL** (`?q=kamal&group=O-`), so reloading or sharing the link keeps them. Two tables on one page use different keys (`q` for matches, `rq` for replies).
+- **No results** names what is filtered ("No O− donors in Kandy") and offers **Clear filters**, plus a wider alternative where there is one ("Show compatible").
+- Lists that the backend returns in full are filtered in the browser. Users search on the server, because that list is capped at the newest 200.
+
+Adding it to a table:
+
+```tsx
+const filters = useUrlFilters(['q', 'status'] as const);
+const { q, status } = filters.values;
+const rows = data.filter((row) => matchesQuery(q, row.name, row.city) && (!status || row.status === status));
+
+<Panel title="Requests">
+  <FilterBar shown={rows.length} total={data.length} active={filters.active} onClear={filters.clear}>
+    <SearchInput label="Search requests" value={q} onChange={(value) => filters.set('q', value)} />
+    <FilterSelect label="Status" allLabel="Any status" value={status}
+                  onChange={(value) => filters.set('status', value)} options={[{ value: 'OPEN', label: 'Open' }]} />
+  </FilterBar>
+  {rows.length === 0 && filters.active ? <StateView state="no-results" … /> : <Table rows={rows} … />}
+</Panel>
+```
 
 ---
 

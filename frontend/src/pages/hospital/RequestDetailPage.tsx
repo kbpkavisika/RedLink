@@ -1,14 +1,15 @@
 import { ArrowLeft, Phone, RefreshCw, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import {
   Badge,
   BloodGroupBadge,
   Button,
+  FilterBar,
+  FilterSelect,
   LinkButton,
   Panel,
-  SegmentedControl,
-  Select,
+  SearchInput,
   StateView,
   Table,
   UrgencyTag,
@@ -16,8 +17,10 @@ import {
   type Column,
 } from '../../components/ui';
 import { useMatches, useRequest } from '../../hooks/useRequests';
+import { useUrlFilters } from '../../hooks/useUrlFilters';
 import { compatibleDonorGroups } from '../../lib/bloodGroups';
 import { formatBloodGroup, formatInstant } from '../../lib/format';
+import { matchesQuery } from '../../lib/search';
 import { ResponsesPanel } from './ResponsesPanel';
 import type { ApiError, BloodRequestDetail, MatchedDonor, RequestStatus } from '../../types';
 
@@ -211,59 +214,47 @@ const columns: Column<MatchedDonor & { rank: number }>[] = [
   },
 ];
 
-type CityFilter = 'all' | 'same';
+const MATCH_FILTERS = ['q', 'group', 'city'] as const;
 
 function MatchList({ request }: { request: BloodRequestDetail }) {
-  const [params, setParams] = useSearchParams();
+  const filters = useUrlFilters(MATCH_FILTERS);
   const groups = compatibleDonorGroups(request.bloodGroup);
-  const group = groups.find((g) => g === params.get('group')) ?? '';
-  const cityFilter: CityFilter = params.get('city') === 'same' ? 'same' : 'all';
-  const filtered = group !== '' || cityFilter === 'same';
+  const group = groups.find((g) => g === filters.values.group) ?? '';
+  const sameCity = filters.values.city === 'same';
+  const { q } = filters.values;
 
+  // Group and city are applied by the server; the name search narrows what came back
   const { data: matches, isPending, isError, error, refetch, isRefetching, isPlaceholderData } = useMatches(request.id, {
     bloodGroup: group || undefined,
-    city: cityFilter === 'same' ? request.city : undefined,
+    city: sameCity ? request.city : undefined,
   });
-
-  const update = (changes: Record<string, string | null>) => {
-    setParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        Object.entries(changes).forEach(([key, value]) => (value ? next.set(key, value) : next.delete(key)));
-        return next;
-      },
-      { replace: true },
-    );
-  };
+  // Rank first, then search, so a donor found by name keeps their real place in the ranking
+  const ranked = (matches ?? []).map((match, index) => ({ ...match, rank: index + 1 }));
+  const rows = ranked.filter((match) => matchesQuery(q, match.name, match.phone, match.city));
 
   const open = request.status === 'OPEN';
 
-  const filters = open && (
-    <div className="flex flex-wrap items-end gap-3 border-b border-border px-5 py-4">
-      <Select
+  const toolbar = open && (
+    <FilterBar active={filters.active} onClear={filters.clear}>
+      <SearchInput label="Search matched donors" placeholder="Donor name or phone" value={q} onChange={(value) => filters.set('q', value)} />
+      <FilterSelect
         label="Blood group"
-        className="w-full sm:w-56"
+        allLabel="All compatible groups"
         value={group}
-        onChange={(event) => update({ group: event.target.value || null })}
-      >
-        <option value="">All compatible groups</option>
-        {groups.map((g) => (
-          <option key={g} value={g}>
-            {formatBloodGroup(g)}
-            {g === request.bloodGroup ? ' (exact)' : ''}
-          </option>
-        ))}
-      </Select>
-      <SegmentedControl<CityFilter>
-        label="Filter donors by city"
-        value={cityFilter}
-        onChange={(value) => update({ city: value === 'same' ? 'same' : null })}
-        options={[
-          { value: 'all', label: 'All cities' },
-          { value: 'same', label: `${request.city} only` },
-        ]}
+        onChange={(value) => filters.set('group', value)}
+        options={groups.map((g) => ({
+          value: g,
+          label: `${formatBloodGroup(g)}${g === request.bloodGroup ? ' (exact)' : ''}`,
+        }))}
       />
-    </div>
+      <FilterSelect
+        label="City"
+        allLabel="All cities"
+        value={sameCity ? 'same' : ''}
+        onChange={(value) => filters.set('city', value)}
+        options={[{ value: 'same', label: `${request.city} only` }]}
+      />
+    </FilterBar>
   );
 
   let body: ReactNode;
@@ -295,34 +286,35 @@ function MatchList({ request }: { request: BloodRequestDetail }) {
         }
       />
     );
-  } else if (matches.length === 0 && filtered) {
+  } else if (rows.length === 0 && filters.active) {
     // H12: say which filters found nobody, and offer the widest useful alternative
     const what = group ? `${formatBloodGroup(group)} donors` : 'compatible donors';
-    const where = cityFilter === 'same' ? ` in ${request.city}` : '';
+    const where = sameCity ? ` in ${request.city}` : '';
+    const named = q ? ` named "${q}"` : '';
     body = (
       <StateView
         state="no-results"
-        title={`No eligible ${what}${where}`}
+        title={`No eligible ${what}${where}${named}`}
         description="Every donor shown here is available and hasn't donated in the last 90 days. Widen the search to see more."
         secondaryAction={
-          <Button variant="outline" onClick={() => update({ group: null, city: null })}>
+          <Button variant="outline" onClick={filters.clear}>
             Clear filters
           </Button>
         }
         action={
           group ? (
-            <Button variant="dark" onClick={() => update({ group: null })}>
+            <Button variant="dark" onClick={() => filters.set('group', null)}>
               Show compatible
             </Button>
-          ) : (
-            <Button variant="dark" onClick={() => update({ city: null })}>
+          ) : sameCity ? (
+            <Button variant="dark" onClick={() => filters.set('city', null)}>
               Show all cities
             </Button>
-          )
+          ) : undefined
         }
       />
     );
-  } else if (matches.length === 0) {
+  } else if (rows.length === 0) {
     body = (
       <StateView
         state="empty"
@@ -336,7 +328,7 @@ function MatchList({ request }: { request: BloodRequestDetail }) {
       <div aria-busy={isPlaceholderData || undefined} className={isPlaceholderData ? 'opacity-60 transition-opacity' : undefined}>
         <Table
           caption={`Donors who can give to #${request.reference}, best match first`}
-          rows={matches.map((match, index) => ({ ...match, rank: index + 1 }))}
+          rows={rows}
           rowKey={(match) => match.donorId}
           columns={columns}
         />
@@ -350,12 +342,12 @@ function MatchList({ request }: { request: BloodRequestDetail }) {
       actions={
         open && matches && matches.length > 0 && (
           <span className="text-label text-text-subtle">
-            {matches.length} {filtered ? 'shown' : 'total'} · best match first
+            {filters.active ? `${rows.length} shown` : `${matches.length} total`} · best match first
           </span>
         )
       }
     >
-      {filters}
+      {toolbar}
       {body}
     </Panel>
   );
