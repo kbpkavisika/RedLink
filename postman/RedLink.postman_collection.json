@@ -594,6 +594,77 @@
             "header": [],
             "url": { "raw": "{{baseUrl}}/requests/{{requestId}}/responses", "host": ["{{baseUrl}}"], "path": ["requests", "{{requestId}}", "responses"] }
           }
+        },
+        {
+          "name": "Mark fulfilled (donors who accepted)",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "// Everyone who accepted this request is recorded as having donated",
+              "pm.sendRequest({",
+              "  url: pm.variables.replaceIn('{{baseUrl}}/requests/{{requestId}}/responses'),",
+              "  header: { Authorization: 'Bearer ' + pm.collectionVariables.get('token') }",
+              "}, (err, res) => {",
+              "  const ids = res.json().filter(r => r.status === 'ACCEPTED').map(r => r.donorId);",
+              "  pm.variables.set('fulfilDonorIds', JSON.stringify(ids));",
+              "});"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "const ids = JSON.parse(pm.variables.get('fulfilDonorIds') || '[]');",
+              "if (ids.length === 0) {",
+              "  pm.test('Nobody accepted, so 400', () => pm.response.to.have.status(400));",
+              "} else {",
+              "  pm.test('Fulfilled', () => pm.expect(pm.response.json().request.status).to.eql('FULFILLED'));",
+              "  pm.test('Donations recorded', () => pm.expect(pm.response.json().donatedDonorIds).to.have.members(ids));",
+              "}"
+            ] } }
+          ],
+          "request": {
+            "description": "Accept the request as a donor first (7. Donor > Accept), then sign in as approved staff again.",
+            "method": "PATCH",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"FULFILLED\",\n  \"donorIds\": {{fulfilDonorIds}}\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/requests/{{requestId}}/status", "host": ["{{baseUrl}}"], "path": ["requests", "{{requestId}}", "status"] }
+          }
+        },
+        {
+          "name": "Close again (409)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status 409 once closed', () => pm.response.to.have.status(409));"
+            ] } }
+          ],
+          "request": {
+            "description": "Closing is final: run after Mark fulfilled.",
+            "method": "PATCH",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"CANCELLED\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/requests/{{requestId}}/status", "host": ["{{baseUrl}}"], "path": ["requests", "{{requestId}}", "status"] }
+          }
+        },
+        {
+          "name": "Cancel a request",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "// Posts a throwaway request to cancel, so the main one is untouched",
+              "pm.sendRequest({",
+              "  url: pm.variables.replaceIn('{{baseUrl}}/requests'),",
+              "  method: 'POST',",
+              "  header: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + pm.collectionVariables.get('token') },",
+              "  body: { mode: 'raw', raw: JSON.stringify({ bloodGroup: 'B+', unitsNeeded: 1, urgency: 'LOW', city: 'Colombo',",
+              "    neededBy: new Date(Date.now() + 86400000).toISOString() }) }",
+              "}, (err, res) => pm.variables.set('cancelRequestId', res.json().request.id));"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Cancelled', () => pm.expect(pm.response.json().request.status).to.eql('CANCELLED'));",
+              "pm.test('No donations', () => pm.expect(pm.response.json().donatedDonorIds).to.be.empty);"
+            ] } }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"CANCELLED\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/requests/{{cancelRequestId}}/status", "host": ["{{baseUrl}}"], "path": ["requests", "{{cancelRequestId}}", "status"] }
+          }
         }
       ]
     },
@@ -737,7 +808,24 @@
             "body": { "mode": "raw", "raw": "{\n  \"status\": \"DECLINED\"\n}", "options": { "raw": { "language": "json" } } },
             "url": { "raw": "{{baseUrl}}/requests/{{declineRequestId}}/responses", "host": ["{{baseUrl}}"], "path": ["requests", "{{declineRequestId}}", "responses"] }
           }
-        }      ]
+        },
+        {
+          "name": "My donation history",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const h = pm.response.json();",
+              "console.log(`${h.totalDonations} donations · ${h.livesHelped} lives helped`);"
+            ] } }
+          ],
+          "request": {
+            "description": "After Mark fulfilled (6), the donation appears here for the donors who gave.",
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/donor/donations", "host": ["{{baseUrl}}"], "path": ["donor", "donations"] }
+          }
+        }
+      ]
     }
   ]
 }

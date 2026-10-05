@@ -1,5 +1,5 @@
-import { ArrowLeft, Phone, RefreshCw, Users } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { ArrowLeft, CheckCircle2, Phone, RefreshCw, Users } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Badge,
@@ -21,8 +21,9 @@ import { useUrlFilters } from '../../hooks/useUrlFilters';
 import { compatibleDonorGroups } from '../../lib/bloodGroups';
 import { formatBloodGroup, formatInstant } from '../../lib/format';
 import { matchesQuery } from '../../lib/search';
+import { CloseRequestPanel, type CloseMode } from './CloseRequestPanel';
 import { ResponsesPanel } from './ResponsesPanel';
-import type { ApiError, BloodRequestDetail, MatchedDonor, RequestStatus } from '../../types';
+import type { ApiError, BloodRequestDetail, MatchedDonor, RequestOverview, RequestStatus } from '../../types';
 
 const STATUS: Record<RequestStatus, { label: string; tone: BadgeTone }> = {
   OPEN: { label: 'Open', tone: 'info' },
@@ -63,6 +64,7 @@ export function RequestDetailPage() {
 
 function RequestDetail({ id }: { id: number }) {
   const { data, isPending, isError, error, refetch, isRefetching } = useRequest(id);
+  const [closing, setClosing] = useState<CloseMode | null>(null);
 
   if (isPending) {
     return (
@@ -81,8 +83,15 @@ function RequestDetail({ id }: { id: number }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <RequestSummary request={data.request} notifiedCount={data.notifiedCount} />
-      <ResponsesPanel request={data.request} notifiedCount={data.notifiedCount} />
+      <RequestSummary overview={data} onClose={data.request.status === 'OPEN' ? setClosing : undefined} />
+      {closing && data.request.status === 'OPEN' && (
+        <CloseRequestPanel request={data.request} mode={closing} onClose={() => setClosing(null)} />
+      )}
+      <ResponsesPanel
+        request={data.request}
+        notifiedCount={data.notifiedCount}
+        donatedDonorIds={data.donatedDonorIds}
+      />
       <MatchList request={data.request} />
     </div>
   );
@@ -113,7 +122,14 @@ function RequestError({ error, retrying, onRetry }: { error: ApiError; retrying:
   );
 }
 
-function RequestSummary({ request, notifiedCount }: { request: BloodRequestDetail; notifiedCount: number }) {
+interface RequestSummaryProps {
+  overview: RequestOverview;
+  // Only while the request is OPEN: opens the fulfil or cancel panel
+  onClose?: (mode: CloseMode) => void;
+}
+
+function RequestSummary({ overview, onClose }: RequestSummaryProps) {
+  const { request, notifiedCount, donatedDonorIds } = overview;
   const status = STATUS[request.status];
   return (
     <Panel padded>
@@ -123,6 +139,16 @@ function RequestSummary({ request, notifiedCount }: { request: BloodRequestDetai
           <h2 className="font-display text-display-sm text-ink">#{request.reference}</h2>
           <UrgencyTag urgency={request.urgency} />
           <Badge tone={status.tone}>{status.label}</Badge>
+          {onClose && (
+            <div className="ml-auto flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => onClose('cancel')}>
+                Cancel request
+              </Button>
+              <Button onClick={() => onClose('fulfil')} leftIcon={<CheckCircle2 size={16} aria-hidden="true" />}>
+                Mark fulfilled
+              </Button>
+            </div>
+          )}
         </div>
 
         <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -131,14 +157,20 @@ function RequestSummary({ request, notifiedCount }: { request: BloodRequestDetai
           </Fact>
           <Fact label="Needed by">{formatInstant(request.neededBy, true)}</Fact>
           <Fact label="City">{request.city}</Fact>
-          <Fact label="Notified when posted">
-            {notifiedCount} {notifiedCount === 1 ? 'donor' : 'donors'}
-          </Fact>
+          {request.status === 'FULFILLED' ? (
+            <Fact label="Donated">
+              {donatedDonorIds.length} {donatedDonorIds.length === 1 ? 'donor' : 'donors'} · {notifiedCount} notified
+            </Fact>
+          ) : (
+            <Fact label="Notified when posted">
+              {notifiedCount} {notifiedCount === 1 ? 'donor' : 'donors'}
+            </Fact>
+          )}
         </dl>
 
         <p className="text-caption text-text-subtle">
           Posted by {request.createdBy} on {formatInstant(request.createdAt, true)}
-          {request.closedAt && ` · Closed ${formatInstant(request.closedAt, true)}`}
+          {request.closedAt && ` · ${status.label} ${formatInstant(request.closedAt, true)}`}
         </p>
       </div>
     </Panel>

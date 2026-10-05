@@ -113,8 +113,7 @@ public class BloodRequestService {
 
     public RequestOverview findById(Long id) {
         BloodRequest request = ownRequest(id);
-        return new RequestOverview(BloodRequestDetail.from(request),
-                notificationRepository.countByRequestIdAndUserRole(id, Role.DONOR));
+        return overview(request);
     }
 
     /**
@@ -166,8 +165,7 @@ public class BloodRequestService {
 
         request.setStatus(body.status());
         request.setClosedAt(Instant.now(clock));
-        return new RequestOverview(BloodRequestDetail.from(request),
-                notificationRepository.countByRequestIdAndUserRole(id, Role.DONOR));
+        return overview(request);
     }
 
     private void recordDonations(BloodRequest request, List<Long> donorIds) {
@@ -222,6 +220,13 @@ public class BloodRequestService {
                 .filter(request -> staff.getHospital() != null
                         && request.getHospital().getId().equals(staff.getHospital().getId()))
                 .orElseThrow(() -> new NotFoundException("Request " + BloodRequestDetail.reference(id) + " was not found."));
+    }
+
+    private RequestOverview overview(BloodRequest request) {
+        Long id = request.getId();
+        return new RequestOverview(BloodRequestDetail.from(request),
+                notificationRepository.countByRequestIdAndUserRole(id, Role.DONOR),
+                donationRepository.findByRequestId(id).stream().map(donation -> donation.getDonor().getId()).toList());
     }
 
     // Hospital approval is not a role (README "Authentication"): staff are signed in, but can't post until APPROVED

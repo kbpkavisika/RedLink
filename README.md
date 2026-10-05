@@ -127,6 +127,12 @@ See [Authentication](#authentication) for how tokens and roles work.
             └──► EXPIRED     (needed-by date passed with no fulfilment)
 ```
 
+- Staff close a request with `PATCH /api/requests/{id}/status`. Closing is final: a closed request can't be reopened (`409`), and it takes no more replies.
+- **Fulfilling** names the donors who actually gave blood, chosen from those who **accepted**. Each gets a `donations` row (today, 1 unit) and their `last_donation_date` becomes today, which restarts their 90-day clock: they drop out of matching and can't accept again until it's over.
+- **Cancelling** records no donations.
+- `EXPIRED` is set by the system when the needed-by time passes, never by staff *(expiry job: Phase 7)*.
+- Closing locks the request row, as replying does, so a donor can't accept in the middle of a hospital closing the request.
+
 ### Donor response lifecycle
 
 ```
@@ -435,6 +441,7 @@ Every table has the same toolbar at the top of its panel:
 | Admin: users | Name, email (on the server) | Role tabs, status (active, temporary password, disabled) |
 | Request page: donor replies | Name, phone, city | Reply (coming, can't make it, declined) |
 | Request page: ranked matches | Name, phone, city | Compatible blood group, the request's city only |
+| Donor: donation history | Hospital, city, `RQ-` number | Year (once there are donations in more than one) |
 
 How it behaves:
 
@@ -847,7 +854,8 @@ Start the backend first (step 4). All endpoints are under `http://localhost:8080
 | `POST` | `/api/admin/users` | Admin | Add `HOSPITAL_STAFF` to an approved hospital with a temporary password; `201` |
 | `PATCH` | `/api/admin/users/{id}/password` | Admin | Set a temporary password (not your own); the user must change it at next sign-in |
 | `POST` | `/api/requests` | Hospital (approved) | Post a request: `bloodGroup`, `unitsNeeded` (1–20), `urgency`, `city`, `neededBy` (future ISO time). Notifies the top matches; `201` with the request (`reference` "RQ-12"), `matchCount` and `notifiedCount`. `403` while the hospital isn't approved |
-| `GET` | `/api/requests/{id}` | Hospital | The request and how many donors were notified. Another hospital's request is `404` |
+| `GET` | `/api/requests/{id}` | Hospital | The request, how many donors were notified, and `donatedDonorIds` once fulfilled. Another hospital's request is `404` |
+| `PATCH` | `/api/requests/{id}/status` | Hospital | `{"status":"FULFILLED","donorIds":[…]}` (each must have accepted; records donations) or `{"status":"CANCELLED"}`. Only an `OPEN` request; final |
 | `GET` | `/api/requests/{id}/matches?bloodGroup=&city=` | Hospital | Ranked matches with phone, days since last donation, `exactMatch` and `sameCity`. Optional filters keep the order; encode `+` as `%2B` (`O%2B`) |
 | `GET` | `/api/requests/{id}/responses` | Hospital | Donors' replies with name, phone, group and city: accepted first, then withdrawn, then declined |
 | `GET` | `/api/donor/me` | Donor | Own profile plus eligibility: `eligible`, `nextEligibleDate`, `daysSinceLastDonation`, `daysBetweenDonations` |
@@ -856,6 +864,7 @@ Start the backend first (step 4). All endpoints are under `http://localhost:8080
 | `GET` | `/api/donor/requests` | Donor | Open requests the donor's group can give to, in any city: critical first, then their city, then the soonest deadline. Includes the hospital's address and phone, and `myResponse` |
 | `POST` | `/api/requests/{id}/responses` | Donor | `{"status":"ACCEPTED"}` or `"DECLINED"`, once; `201`. Accepting needs the donor to be eligible (90-day rule) |
 | `PATCH` | `/api/requests/{id}/responses/me` | Donor | `{"status":"WITHDRAWN"}`: only an accepted reply, only while the request is open |
+| `GET` | `/api/donor/donations` | Donor | `totalDonations`, `totalUnits`, `livesHelped`, `nextEligibleDate`, and every donation newest first (hospital, date, `#RQ-…`, units) |
 
 Everything except register and login needs the header `Authorization: Bearer <token>`.
 
@@ -934,6 +943,7 @@ The repo includes a ready-made collection in [`postman/`](postman/):
    - **5. Admin: users:** run **All hospitals** (in 4) first, so **Add staff user** has an approved hospital.
    - **6. Blood requests:** sign in as approved staff and run **Post a request** first; it saves the request for the view and match requests.
    - **7. Donor:** after posting a request in 6, run **Login as donor** (Kamal, O+, who can give to that A+ request), then **Incoming requests**; it saves the requests to accept and decline. Run **Donor replies** in 6 as staff afterwards to see them.
+   - **Fulfil and cancel (6):** as Kamal, **Accept** the request (without withdrawing), sign in as approved staff again, then run **Mark fulfilled**. It looks up who accepted and records their donations. **Close again** then expects `409`. **Cancel a request** posts and cancels its own request. As Kamal, **My donation history** (7) then shows the donation.
 
 The registration requests use `{{$timestamp}}`, so each run creates a new account and signs in as it. To use the deployed API later, duplicate the environment and change `baseUrl`. When you add an endpoint, add it to the collection too (export it from Postman over the file in `postman/`).
 
@@ -987,6 +997,8 @@ cd backend
 | `DonorProfileIntegrationTest` | The donor's profile and eligibility (never donated, 30 days, the 90th day), editing name/phone/city only, availability | ✅ |
 | `IncomingRequestsIntegrationTest` | Only groups the donor can give to, the order (critical → own city → soonest), closed and overdue left out, the donor's own reply | ✅ |
 | `DonorResponseIntegrationTest` | Reply once, eligibility to accept, incompatible groups, closed requests, withdraw rules, and the hospital's ordered list of replies | ✅ |
+| `CloseBloodRequestIntegrationTest` | Fulfilling records one donation per donor and restarts their 90-day clock; only accepted donors; cancelling records none; closing is final | ✅ |
+| `DonationHistoryIntegrationTest` | Empty history, newest first with hospital and request, totals and next eligible date, and a fulfilled request showing up the same day | ✅ |
 
 Tests that need PostgreSQL use the separate `redLink_test` database (create it in [step 2](#2-create-the-database)), with the same user and password as the app. They run inside a transaction that is **rolled back**, use unique `@test.redlink.lk` emails, and keep the admin seeder switched off. Tests use their own JWT secret from `src/test/resources/config/application.properties`.
 
@@ -1023,8 +1035,10 @@ To run only the tests that don't need a database:
 
 | Method | Endpoint | Role | Description |
 |---|---|---|---|
-| `PATCH` | `/api/requests/{id}/status` | Hospital | Mark fulfilled or cancelled |
-| `GET` | `/api/donor/donations` | Donor | Donation history |
+| `GET` | `/api/notifications` | Signed in | Own notifications, newest first (Phase 6) |
+| `PATCH` | `/api/notifications/{id}/read`, `/api/notifications/read-all` | Signed in | Mark one or all as read (Phase 6) |
+| `GET` | `/api/requests` | Hospital | The hospital's own requests, with filters and summary counts (Phase 7) |
+| `GET` | `/api/admin/requests`, `/api/admin/requests/{id}` | Admin | Every request across hospitals, read-only (Phase 7) |
 
 All of these will need the header `Authorization: Bearer <token>`.
 
@@ -1124,7 +1138,7 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Blood requests and the matching engine (post, ranked matches with filters, request page)
 - [x] Configurable notification count (units × urgency multiplier, capped)
 - [x] Donor side: profile, availability, eligibility ring, incoming requests, accept / decline / withdraw, and replies on the hospital's request page
-- [ ] Fulfilling and cancelling requests, and donation history
+- [x] Fulfilling and cancelling requests (donations recorded, 90-day clock restarted), and the donor's donation history
 - [ ] Notifications
 - [ ] Role-based dashboards in the frontend (placeholders in place)
 - [ ] Frontend component tests (Vitest + Testing Library)

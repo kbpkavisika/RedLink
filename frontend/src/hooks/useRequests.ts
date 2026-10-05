@@ -1,5 +1,13 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createRequest, getMatches, getRequest, getResponses, requestKeys, type MatchFilters } from '../api/requests';
+import {
+  closeRequest,
+  createRequest,
+  getMatches,
+  getRequest,
+  getResponses,
+  requestKeys,
+  type MatchFilters,
+} from '../api/requests';
 import type {
   ApiError,
   CreateBloodRequestRequest,
@@ -7,6 +15,7 @@ import type {
   PostedRequestResponse,
   RequestOverview,
   RequestResponse,
+  UpdateRequestStatusRequest,
 } from '../types';
 
 export function useCreateRequest() {
@@ -15,7 +24,7 @@ export function useCreateRequest() {
     mutationFn: createRequest,
     onSuccess: ({ request, notifiedCount }) => {
       // The request page opens straight from the success screen, so give it the data already in hand
-      queryClient.setQueryData<RequestOverview>(requestKeys.detail(request.id), { request, notifiedCount });
+      queryClient.setQueryData<RequestOverview>(requestKeys.detail(request.id), { request, notifiedCount, donatedDonorIds: [] });
     },
   });
 }
@@ -42,5 +51,22 @@ export function useResponses(id: number) {
     queryKey: requestKeys.responses(id),
     queryFn: () => getResponses(id),
     refetchInterval: 30_000,
+  });
+}
+
+// Closing changes the request, its matches (none once closed) and how its replies read
+export function useCloseRequest(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation<RequestOverview, ApiError, UpdateRequestStatusRequest>({
+    mutationFn: (body) => closeRequest(id, body),
+    onSuccess: (overview) => {
+      queryClient.setQueryData(requestKeys.detail(id), overview);
+      void queryClient.invalidateQueries({ queryKey: [...requestKeys.all, 'matches', id] });
+      void queryClient.invalidateQueries({ queryKey: requestKeys.responses(id) });
+    },
+    // 409: someone else closed it first; show what they did
+    onError: (error) => {
+      if (error.status === 409) void queryClient.invalidateQueries({ queryKey: requestKeys.detail(id) });
+    },
   });
 }

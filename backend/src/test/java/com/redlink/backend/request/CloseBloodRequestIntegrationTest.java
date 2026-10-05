@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -73,7 +74,12 @@ class CloseBloodRequestIntegrationTest {
         close(staff, request, fulfil(came, alsoCame))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.request.status").value("FULFILLED"))
-                .andExpect(jsonPath("$.request.closedAt").isNotEmpty());
+                .andExpect(jsonPath("$.request.closedAt").isNotEmpty())
+                .andExpect(jsonPath("$.donatedDonorIds.length()").value(2));
+
+        mvc.perform(get("/api/requests/{id}", request.getId()).header("Authorization", testData.bearer(staff)))
+                .andExpect(jsonPath("$.donatedDonorIds").value(containsInAnyOrder(
+                        came.getId().intValue(), alsoCame.getId().intValue())));
 
         List<Donation> donations = donationRepository.findByRequestId(request.getId());
         assertThat(donations).hasSize(2).allSatisfy(donation -> {
