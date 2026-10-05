@@ -11,6 +11,9 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     // Everyone notified about a request, in the order they were notified (best match first)
     List<Notification> findByRequestIdOrderById(Long requestId);
 
+    // A user's notifications, newest first
+    List<Notification> findByUserIdOrderByCreatedAtDescIdDesc(Long userId);
+
     // Donors notified about a request; staff notifications about the same request don't count
     long countByRequestIdAndUserRole(Long requestId, Role role);
 }
