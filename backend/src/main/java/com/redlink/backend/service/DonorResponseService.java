@@ -112,8 +112,9 @@ public class DonorResponseService {
         return toIncoming(request, donor, response);
     }
 
+    // Locked like closing a request does, so a reply and the hospital closing the request can't overlap
     private BloodRequest findRequest(Long id) {
-        return bloodRequestRepository.findByIdWithHospital(id)
+        return bloodRequestRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new NotFoundException("Request " + BloodRequestDetail.reference(id) + " was not found."));
     }
 

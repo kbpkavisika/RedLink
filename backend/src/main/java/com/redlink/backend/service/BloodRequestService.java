@@ -7,11 +7,15 @@ import com.redlink.backend.dto.request.MatchedDonor;
 import com.redlink.backend.dto.request.PostedRequestResponse;
 import com.redlink.backend.dto.request.RequestOverview;
 import com.redlink.backend.dto.request.RequestResponse;
+import com.redlink.backend.dto.request.UpdateRequestStatusRequest;
 import com.redlink.backend.exception.BadRequestException;
+import com.redlink.backend.exception.ConflictException;
 import com.redlink.backend.exception.ForbiddenException;
 import com.redlink.backend.exception.NotFoundException;
 import com.redlink.backend.model.BloodRequest;
+import com.redlink.backend.model.Donation;
 import com.redlink.backend.model.Donor;
+import com.redlink.backend.model.DonorResponse;
 import com.redlink.backend.model.Hospital;
 import com.redlink.backend.model.Notification;
 import com.redlink.backend.model.User;
@@ -21,6 +25,7 @@ import com.redlink.backend.model.enums.RequestStatus;
 import com.redlink.backend.model.enums.ResponseStatus;
 import com.redlink.backend.model.enums.Role;
 import com.redlink.backend.repository.BloodRequestRepository;
+import com.redlink.backend.repository.DonationRepository;
 import com.redlink.backend.repository.DonorResponseRepository;
 import com.redlink.backend.repository.NotificationRepository;
 import com.redlink.backend.security.CurrentUser;
@@ -30,8 +35,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Hospital staff's blood requests. Posting (H3, H4, H6) is one transaction:
@@ -51,6 +61,7 @@ public class BloodRequestService {
     private final BloodRequestRepository bloodRequestRepository;
     private final NotificationRepository notificationRepository;
     private final DonorResponseRepository donorResponseRepository;
+    private final DonationRepository donationRepository;
     private final MatchingService matchingService;
     private final MatchingProperties matchingProperties;
     private final CurrentUser currentUser;
@@ -58,11 +69,12 @@ public class BloodRequestService {
 
     public BloodRequestService(BloodRequestRepository bloodRequestRepository,
                                NotificationRepository notificationRepository, DonorResponseRepository donorResponseRepository,
-                               MatchingService matchingService,
+                               DonationRepository donationRepository, MatchingService matchingService,
                                MatchingProperties matchingProperties, CurrentUser currentUser, Clock clock) {
         this.bloodRequestRepository = bloodRequestRepository;
         this.notificationRepository = notificationRepository;
         this.donorResponseRepository = donorResponseRepository;
+        this.donationRepository = donationRepository;
         this.matchingService = matchingService;
         this.matchingProperties = matchingProperties;
         this.currentUser = currentUser;
@@ -121,6 +133,69 @@ public class BloodRequestService {
                 .filter(match -> bloodGroup == null || match.bloodGroup() == bloodGroup)
                 .filter(match -> !filterCity || Cities.same(match.city(), city))
                 .toList();
+    }
+
+    /**
+     * H8, H9: close an OPEN request. Final either way (README "Request lifecycle").
+     *   FULFILLED: one donation (1 unit, today) per donor who gave blood, and their last_donation_date
+     *              becomes today, which restarts their 90-day clock. Only donors who ACCEPTED can be picked.
+     *   CANCELLED: no donations.
+     * The request row is locked first, so a donor's reply can't land in the middle of closing it.
+     */
+    @Transactional
+    public RequestOverview close(Long id, UpdateRequestStatusRequest body) {
+        User staff = currentUser.require();
+        BloodRequest request = bloodRequestRepository.findByIdForUpdate(id)
+                .filter(found -> staff.getHospital() != null
+                        && found.getHospital().getId().equals(staff.getHospital().getId()))
+                .orElseThrow(() -> new NotFoundException("Request " + BloodRequestDetail.reference(id) + " was not found."));
+
+        if (body.status() != RequestStatus.FULFILLED && body.status() != RequestStatus.CANCELLED) {
+            throw new BadRequestException("A request can be marked FULFILLED or CANCELLED.",
+                    "status", "must be FULFILLED or CANCELLED");
+        }
+        if (request.getStatus() != RequestStatus.OPEN) {
+            throw new ConflictException("This request is already closed.");
+        }
+
+        if (body.status() == RequestStatus.FULFILLED) {
+            recordDonations(request, body.donorIds());
+        } else if (!body.donorIds().isEmpty()) {
+            throw new BadRequestException("A cancelled request has no donations.", "donorIds", "must be empty when cancelling");
+        }
+
+        request.setStatus(body.status());
+        request.setClosedAt(Instant.now(clock));
+        return new RequestOverview(BloodRequestDetail.from(request),
+                notificationRepository.countByRequestIdAndUserRole(id, Role.DONOR));
+    }
+
+    private void recordDonations(BloodRequest request, List<Long> donorIds) {
+        Set<Long> picked = new LinkedHashSet<>(donorIds);
+        if (picked.isEmpty()) {
+            throw new BadRequestException("Choose at least one donor who gave blood, or cancel the request instead.",
+                    "donorIds", "must include at least one donor");
+        }
+        Map<Long, Donor> accepted = donorResponseRepository.findByRequestIdWithDonor(request.getId()).stream()
+                .filter(response -> response.getStatus() == ResponseStatus.ACCEPTED)
+                .collect(Collectors.toMap(response -> response.getDonor().getId(), DonorResponse::getDonor));
+        if (!accepted.keySet().containsAll(picked)) {
+            throw new BadRequestException("Only donors who accepted this request can be marked as having donated.",
+                    "donorIds", "must all have accepted this request");
+        }
+
+        LocalDate today = LocalDate.now(clock);
+        donationRepository.saveAll(picked.stream().map(donorId -> {
+            Donor donor = accepted.get(donorId);
+            donor.setLastDonationDate(today); // restarts their 90-day clock; saved when the transaction commits
+            Donation donation = new Donation();
+            donation.setDonor(donor);
+            donation.setHospital(request.getHospital());
+            donation.setRequest(request);
+            donation.setDonationDate(today);
+            donation.setUnits(1);
+            return donation;
+        }).toList());
     }
 
     /**

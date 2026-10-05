@@ -1,5 +1,6 @@
 package com.redlink.backend.service;
 
+import com.redlink.backend.dto.donor.DonationHistory;
 import com.redlink.backend.dto.donor.DonorProfile;
 import com.redlink.backend.dto.donor.IncomingRequest;
 import com.redlink.backend.dto.donor.UpdateAvailabilityRequest;
@@ -10,6 +11,7 @@ import com.redlink.backend.model.Donor;
 import com.redlink.backend.model.DonorResponse;
 import com.redlink.backend.model.enums.RequestStatus;
 import com.redlink.backend.repository.BloodRequestRepository;
+import com.redlink.backend.repository.DonationRepository;
 import com.redlink.backend.repository.DonorRepository;
 import com.redlink.backend.repository.DonorResponseRepository;
 import com.redlink.backend.security.CurrentUser;
@@ -27,7 +29,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * The signed-in donor's own data (D2, D3, D4) and incoming requests (D5). Always the current user's donor profile: there is no id
+ * The signed-in donor's own data (D2, D3, D4), incoming requests (D5) and donation history (D10).
+ * Always the current user's donor profile: there is no id
  * to pass, so a donor can never read or change anyone else's.
  */
 @Service
@@ -37,14 +40,17 @@ public class DonorSelfService {
     private final DonorRepository donorRepository;
     private final BloodRequestRepository bloodRequestRepository;
     private final DonorResponseRepository donorResponseRepository;
+    private final DonationRepository donationRepository;
     private final CurrentUser currentUser;
     private final Clock clock;
 
     public DonorSelfService(DonorRepository donorRepository, BloodRequestRepository bloodRequestRepository,
-                            DonorResponseRepository donorResponseRepository, CurrentUser currentUser, Clock clock) {
+                            DonorResponseRepository donorResponseRepository, DonationRepository donationRepository,
+                            CurrentUser currentUser, Clock clock) {
         this.donorRepository = donorRepository;
         this.bloodRequestRepository = bloodRequestRepository;
         this.donorResponseRepository = donorResponseRepository;
+        this.donationRepository = donationRepository;
         this.currentUser = currentUser;
         this.clock = clock;
     }
@@ -101,6 +107,23 @@ public class DonorSelfService {
             .thenComparing(Comparator.comparing(IncomingRequest::sameCity).reversed())
             .thenComparing(IncomingRequest::neededBy)
             .thenComparing(IncomingRequest::requestId);
+
+    // D10: every donation this donor has made through RedLink, newest first, with the totals
+    public DonationHistory donations() {
+        Donor donor = currentDonor();
+        List<DonationHistory.Item> items = donationRepository.findHistory(donor.getId()).stream()
+                .map(DonationHistory.Item::from)
+                .toList();
+        LocalDate last = donor.getLastDonationDate();
+        boolean eligible = DonorEligibility.isEligible(last, LocalDate.now(clock));
+        return new DonationHistory(
+                items.size(),
+                items.stream().mapToInt(DonationHistory.Item::units).sum(),
+                items.size(),
+                eligible,
+                eligible ? null : DonorEligibility.nextEligibleDate(last),
+                items);
+    }
 
     // The signed-in user's donor profile; every DONOR has one (created at registration)
     Donor currentDonor() {
