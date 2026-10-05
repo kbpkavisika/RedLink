@@ -9,6 +9,7 @@ import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
 import { DonorsPage } from './pages/admin/DonorsPage';
 import { DonorHomePage } from './pages/donor/DonorHomePage';
+import { DonorProfilePage } from './pages/donor/DonorProfilePage';
 import { DonorRequestsPage } from './pages/donor/DonorRequestsPage';
 import { HospitalsPage } from './pages/admin/HospitalsPage';
 import { UsersPage } from './pages/admin/UsersPage';
@@ -81,7 +82,7 @@ export default function App() {
               />
               <Route
                 path="/donor/profile"
-                element={<ComingSoonPage title="Your profile" description="Your details and blood group." />}
+                element={<DonorProfilePage />}
               />
             </Route>
 

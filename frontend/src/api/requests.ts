@@ -4,6 +4,7 @@ import type {
   MatchedDonor,
   PostedRequestResponse,
   RequestOverview,
+  RequestResponse,
 } from '../types';
 import api from './client';
 
@@ -17,6 +18,7 @@ export const requestKeys = {
   all: ['requests'] as const,
   detail: (id: number) => [...requestKeys.all, 'detail', id] as const,
   matches: (id: number, filters: MatchFilters = {}) => [...requestKeys.all, 'matches', id, filters] as const,
+  responses: (id: number) => [...requestKeys.all, 'responses', id] as const,
 };
 
 // 201: saved as OPEN, and the top matches were notified. 403 if the hospital isn't approved.
@@ -34,5 +36,11 @@ export async function getRequest(id: number): Promise<RequestOverview> {
 // Ranked best first. Axios encodes the params, so "O+" is sent as O%2B.
 export async function getMatches(id: number, filters: MatchFilters = {}): Promise<MatchedDonor[]> {
   const { data } = await api.get<MatchedDonor[]>(`/requests/${id}/matches`, { params: filters });
+  return data;
+}
+
+// H7: donors' replies, accepted first
+export async function getResponses(id: number): Promise<RequestResponse[]> {
+  const { data } = await api.get<RequestResponse[]>(`/requests/${id}/responses`);
   return data;
 }

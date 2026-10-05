@@ -18,6 +18,7 @@ import {
 import { useMatches, useRequest } from '../../hooks/useRequests';
 import { compatibleDonorGroups } from '../../lib/bloodGroups';
 import { formatBloodGroup, formatInstant } from '../../lib/format';
+import { ResponsesPanel } from './ResponsesPanel';
 import type { ApiError, BloodRequestDetail, MatchedDonor, RequestStatus } from '../../types';
 
 const STATUS: Record<RequestStatus, { label: string; tone: BadgeTone }> = {
@@ -36,7 +37,7 @@ const backToRequests = (
 /**
  * /hospital/requests/:id (H5, H12): the request, then every donor who can give to it, best match first.
  * Filters live in the URL (?group=O-&city=same) so reloading keeps them.
- * Donor responses join this page in the donor-responses phase.
+ * Between them, donors' replies (H7): who is coming, who withdrew, who declined.
  */
 export function RequestDetailPage() {
   const id = Number(useParams().id);
@@ -78,6 +79,7 @@ function RequestDetail({ id }: { id: number }) {
   return (
     <div className="flex flex-col gap-6">
       <RequestSummary request={data.request} notifiedCount={data.notifiedCount} />
+      <ResponsesPanel request={data.request} notifiedCount={data.notifiedCount} />
       <MatchList request={data.request} />
     </div>
   );

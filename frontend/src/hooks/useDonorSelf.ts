@@ -5,12 +5,21 @@ import {
   getMyProfile,
   respondToRequest,
   setMyAvailability,
+  updateMyProfile,
   withdrawResponse,
 } from '../api/donor';
-import type { ApiError, DonorProfile, IncomingRequest } from '../types';
+import type { ApiError, DonorProfile, IncomingRequest, UpdateDonorProfileRequest } from '../types';
 
 export function useMyProfile() {
   return useQuery<DonorProfile, ApiError>({ queryKey: donorSelfKeys.profile(), queryFn: getMyProfile });
+}
+
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+  return useMutation<DonorProfile, ApiError, UpdateDonorProfileRequest>({
+    mutationFn: updateMyProfile,
+    onSuccess: (profile) => queryClient.setQueryData(donorSelfKeys.profile(), profile),
+  });
 }
 
 export function useIncomingRequests() {
