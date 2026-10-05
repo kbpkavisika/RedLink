@@ -404,7 +404,7 @@ Every data view shows one of six states, all from `StateView`:
 | `/admin/hospitals`, `/admin/users`, `/admin/requests`, `/admin/donors` | Admins |
 | `/change-password` | Any signed-in user |
 
-`/` is the public home page for everyone; inside the app, the logo goes to the user's own dashboard. `RequireAuth` sends signed-out users to `/login?from=…`, users with a temporary password to `/change-password`, and users on another role's page back to their own home. After signing in, users return to the `from` page (only paths on this site are accepted). `HospitalApprovalGate` shows staff of a pending or rejected hospital the approval progress, with the admin's reason if rejected, and re-checks the status when they open a hospital page or press **Check again**. This is for convenience only: the backend's 401 and 403 are the real protection. Pages not built yet show a "coming soon" placeholder.
+`/` is the public home page for everyone, and every RedLink logo links to it. `RequireAuth` sends signed-out users to `/login?from=…`, users with a temporary password to `/change-password`, and users on another role's page back to their own home. After signing in, users return to the `from` page (only paths on this site are accepted). `HospitalApprovalGate` shows staff of a pending or rejected hospital the approval progress, with the admin's reason if rejected, and re-checks the status when they open a hospital page or press **Check again**. This is for convenience only: the backend's 401 and 403 are the real protection. Pages not built yet show a "coming soon" placeholder.
 
 ### Development tools
 

@@ -304,7 +304,9 @@ function SiteFooter() {
   return (
     <footer className="bg-ink text-on-dark-muted">
       <div className="mx-auto flex max-w-[1312px] flex-wrap items-center justify-between gap-4 px-4 py-8 text-label sm:px-8">
-        <img src="/brand/redlink-logo-reversed.svg" alt="RedLink" className="h-7" />
+        <Link to="/" aria-label="RedLink home">
+          <img src="/brand/redlink-logo-reversed.svg" alt="RedLink" className="h-7" />
+        </Link>
         <p>
           Questions? <a href="mailto:admin@redlink.lk" className="text-white">admin@redlink.lk</a>
         </p>
