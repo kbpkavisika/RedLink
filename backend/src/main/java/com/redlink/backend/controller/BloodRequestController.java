@@ -4,6 +4,7 @@ import com.redlink.backend.dto.request.CreateBloodRequestRequest;
 import com.redlink.backend.dto.request.MatchedDonor;
 import com.redlink.backend.dto.request.PostedRequestResponse;
 import com.redlink.backend.dto.request.RequestOverview;
+import com.redlink.backend.dto.request.RequestResponse;
 import com.redlink.backend.model.enums.BloodGroup;
 import com.redlink.backend.service.BloodRequestService;
 import jakarta.validation.Valid;
@@ -42,5 +43,11 @@ public class BloodRequestController {
                                          @RequestParam(required = false) BloodGroup bloodGroup,
                                          @RequestParam(required = false) String city) {
         return bloodRequestService.findMatches(id, bloodGroup, city);
+    }
+
+    // H7: donors' replies, accepted first. (Donors reply through DonorResponseController on the same path.)
+    @GetMapping("/{id}/responses")
+    public List<RequestResponse> getResponses(@PathVariable Long id) {
+        return bloodRequestService.findResponses(id);
     }
 }
