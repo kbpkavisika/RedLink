@@ -17,6 +17,7 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { NotificationsPage } from './pages/NotificationsPage';
 import { RegisterDonorPage } from './pages/RegisterDonorPage';
 import { RegisterHospitalPage } from './pages/RegisterHospitalPage';
 import { NewRequestPage } from './pages/hospital/NewRequestPage';
@@ -29,7 +30,7 @@ const ComponentGallery = import.meta.env.DEV ? lazy(() => import('./dev/Componen
  * Route map. Placeholders (ComingSoonPage) are replaced by real pages in the feature branches.
  *   everyone          /  (home page; signed-in users get "Go to dashboard")
  *   public            /login, /register/*, /forgot-password
- *   any signed-in     /change-password
+ *   any signed-in     /change-password, /notifications
  *   HOSPITAL_STAFF    /hospital/*
  *   DONOR             /donor/*
  *   ADMIN             /admin/*
@@ -52,6 +53,7 @@ export default function App() {
         <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>
             <Route path="/change-password" element={<ChangePasswordPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
 
             <Route element={<RequireAuth role="HOSPITAL_STAFF" />}>
               {/* Until the hospital is approved, every page below shows its approval progress instead */}

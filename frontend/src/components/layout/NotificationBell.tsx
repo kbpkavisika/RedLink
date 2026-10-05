@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
 import { useMarkAllRead, useMarkRead, useNotifications } from '../../hooks/useNotifications';
 import { notificationLink, timeAgo } from '../../lib/notifications';
@@ -127,6 +127,14 @@ export function NotificationBell() {
               ))}
             </ul>
           )}
+
+          <Link
+            to="/notifications"
+            onClick={() => setOpen(false)}
+            className="border-t border-border px-4 py-3 text-center text-label font-semibold text-primary no-underline hover:bg-bg hover:text-primary-hover"
+          >
+            See all notifications
+          </Link>
         </div>
       )}
     </div>
