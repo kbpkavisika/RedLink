@@ -21,7 +21,7 @@ import { homePathFor } from '../lib/roles';
 /**
  * "/": the public home page. Everyone sees it, signed in or not; only the buttons change.
  *   signed out → Sign in · Become a donor · Register a hospital
- *   signed in  → Go to dashboard (their role's home)
+ *   signed in  → Dashboard (their role's home), in the hero and the profile menu
  * The dashboards themselves stay behind RequireAuth.
  */
 export function HomePage() {
@@ -46,12 +46,9 @@ function AccountActions() {
   if (status === 'loading') {
     return <span className="h-10 w-32" aria-hidden="true" />;
   }
+  // Signed in: the profile menu next to this has "Dashboard"
   if (user) {
-    return (
-      <LinkButton to={homePathFor(user.role)} rightIcon={<ArrowRight size={16} aria-hidden="true" />}>
-        Go to dashboard
-      </LinkButton>
-    );
+    return null;
   }
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -118,7 +115,7 @@ function Hero() {
         <div className="flex flex-wrap items-center gap-3">
           {user ? (
             <LinkButton to={homePathFor(user.role)} size="lg" rightIcon={<ArrowRight size={18} aria-hidden="true" />}>
-              Go to dashboard
+              Dashboard
             </LinkButton>
           ) : (
             <>

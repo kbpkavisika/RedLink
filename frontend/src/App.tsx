@@ -5,7 +5,7 @@ import { RedirectIfAuthenticated } from './auth/RedirectIfAuthenticated';
 import { RequireAuth } from './auth/RequireAuth';
 import { AppShell } from './components/layout/AppShell';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
-import { ComingSoonPage } from './pages/ComingSoonPage';
+import { AdminRequestsPage } from './pages/admin/AdminRequestsPage';
 import { DonorsPage } from './pages/admin/DonorsPage';
 import { DonorHistoryPage } from './pages/donor/DonorHistoryPage';
 import { DonorHomePage } from './pages/donor/DonorHomePage';
@@ -20,6 +20,8 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { RegisterDonorPage } from './pages/RegisterDonorPage';
 import { RegisterHospitalPage } from './pages/RegisterHospitalPage';
+import { HospitalDashboardPage } from './pages/hospital/HospitalDashboardPage';
+import { HospitalRequestsPage } from './pages/hospital/HospitalRequestsPage';
 import { NewRequestPage } from './pages/hospital/NewRequestPage';
 import { RequestDetailPage } from './pages/hospital/RequestDetailPage';
 
@@ -27,7 +29,7 @@ import { RequestDetailPage } from './pages/hospital/RequestDetailPage';
 const ComponentGallery = import.meta.env.DEV ? lazy(() => import('./dev/ComponentGallery')) : null;
 
 /*
- * Route map. Placeholders (ComingSoonPage) are replaced by real pages in the feature branches.
+ * Route map.
  *   everyone          /  (home page; signed-in users get "Go to dashboard")
  *   public            /login, /register/*, /forgot-password
  *   any signed-in     /change-password, /notifications
@@ -60,11 +62,11 @@ export default function App() {
               <Route element={<HospitalApprovalGate />}>
                 <Route
                   path="/hospital"
-                  element={<ComingSoonPage title="Your dashboard" description="Open requests and responses at a glance." />}
+                  element={<HospitalDashboardPage />}
                 />
                 <Route
                   path="/hospital/requests"
-                  element={<ComingSoonPage title="Requests" description="Every request your hospital has posted." />}
+                  element={<HospitalRequestsPage />}
                 />
                 <Route path="/hospital/requests/new" element={<NewRequestPage />} />
                 <Route path="/hospital/requests/:id" element={<RequestDetailPage />} />
@@ -95,7 +97,7 @@ export default function App() {
               <Route path="/admin/users" element={<UsersPage />} />
               <Route
                 path="/admin/requests"
-                element={<ComingSoonPage title="All requests" description="Requests across every hospital." />}
+                element={<AdminRequestsPage />}
               />
               <Route path="/admin/donors" element={<DonorsPage />} />
             </Route>

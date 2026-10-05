@@ -12,7 +12,7 @@ interface TemporaryPasswordNoticeProps {
 }
 
 /**
- * Shown once after an admin sets a temporary password: the admin passes it on (by phone or in person, never
+ * Shown once after an admin adds a staff user with a first password: the admin passes it on (by phone or in person, never
  * by email to the same inbox), and the user must replace it at first sign-in. It isn't shown again.
  */
 export function TemporaryPasswordNotice({ title, fullName, email, password, children }: TemporaryPasswordNoticeProps) {

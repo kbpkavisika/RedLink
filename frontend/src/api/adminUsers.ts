@@ -1,4 +1,4 @@
-import type { AddStaffRequest, Role, SetTemporaryPasswordRequest, UserSummary } from '../types';
+import type { AddStaffRequest, Role, UserSummary } from '../types';
 import api from './client';
 
 export interface UserSearch {
@@ -22,10 +22,5 @@ export async function searchUsers({ role, q }: UserSearch): Promise<UserSummary[
 
 export async function addStaff(body: AddStaffRequest): Promise<UserSummary> {
   const { data } = await api.post<UserSummary>('/admin/users', body);
-  return data;
-}
-
-export async function setTemporaryPassword(id: number, body: SetTemporaryPasswordRequest): Promise<UserSummary> {
-  const { data } = await api.patch<UserSummary>(`/admin/users/${id}/password`, body);
   return data;
 }

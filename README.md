@@ -42,7 +42,7 @@ Three roles, each with its own view of the system.
 
 | Role | Can do |
 |---|---|
-| **Admin** | Approve or reject hospital registrations (with a reason), manage users, add staff to a hospital, reset a user's password, view all requests |
+| **Admin** | Approve or reject hospital registrations (with a reason), manage users, add staff to a hospital, view all requests. Admins can't see or change anyone's password |
 | **Hospital staff** | Register their hospital, create blood requests, view matched donors, track responses (including withdrawals), mark requests fulfilled or cancelled |
 | **Donor** | Manage profile and availability, view incoming requests, accept or decline, withdraw after accepting, see donation history |
 
@@ -57,7 +57,7 @@ Every user can also change their own password.
 5. When a request is posted, the system notifies the **top-ranked matches**: `units needed × urgency multiplier`, capped at 25. If there are fewer matches than that, all of them are notified.
 6. Registering a hospital also creates its **first staff account**. The admin adds any further staff.
 7. The **first admin is created automatically** at startup from environment variables. Nobody can register themselves as an admin.
-8. **Password reset by email is not in v1.** An admin sets a temporary password, and the user changes it after logging in.
+8. **Nobody can see or change another user's password, admins included.** Password reset by email isn't in v1, so a user who forgets their password can't recover it yet (see Roadmap: Later).
 
 ---
 
@@ -115,7 +115,7 @@ Further staff accounts are created by the admin in **Users → Add staff user** 
 - **Registration** only creates `DONOR` or `HOSPITAL_STAFF` users. Any `role` sent in the request body is ignored. New users are signed in straight away.
 - **Donors** must be 18 to 60 years old when they register.
 - **Emails** are trimmed and lowercased everywhere, so `Kamal@Mail.lk` and `kamal@mail.lk` are the same account.
-- **Forgotten password (v1):** the "Forgot password?" link tells the user to contact the admin. The admin sets a temporary password, and `must_change_password` makes the user choose a new one at their next login.
+- **Forgotten password (v1):** the "Forgot password?" page explains that reset by email isn't available yet and that nobody, including admins, can see or change a password. The only temporary passwords are the first ones: the startup admin's, and the one an admin gives a new staff member; must_change_password makes them choose their own at first sign-in.
 
 See [Authentication](#authentication) for how tokens and roles work.
 
@@ -130,7 +130,7 @@ See [Authentication](#authentication) for how tokens and roles work.
 - Staff close a request with `PATCH /api/requests/{id}/status`. Closing is final: a closed request can't be reopened (`409`), and it takes no more replies.
 - **Fulfilling** names the donors who actually gave blood, chosen from those who **accepted**. Each gets a `donations` row (today, 1 unit) and their `last_donation_date` becomes today, which restarts their 90-day clock: they drop out of matching and can't accept again until it's over.
 - **Cancelling** records no donations.
-- `EXPIRED` is set by the system when the needed-by time passes, never by staff *(expiry job: Phase 7)*.
+- `EXPIRED` is set by the system, never by staff: a background job (`RequestExpiryScheduler`) expires every `OPEN` request whose needed-by time has passed. It runs once at startup, to catch up after downtime, then again `redlink.expiry.interval` (default 5 minutes) after each run. Donors who had accepted are told it's no longer needed. A request someone is replying to or closing at that moment is skipped and picked up next run. Set `redlink.expiry.enabled=false` to switch the job off (the tests do).
 - Closing locks the request row, as replying does, so a donor can't accept in the middle of a hospital closing the request.
 
 ### Donor response lifecycle
@@ -421,14 +421,14 @@ Every data view shows one of six states, all from `StateView`:
 
 | Path | Who |
 |---|---|
-| `/` | Everyone: the home page. Visitors see Sign in / Become a donor / Register a hospital; signed-in users see Go to dashboard |
+| `/` | Everyone: the home page. Visitors see Sign in / Become a donor / Register a hospital; signed-in users see **Dashboard** in the hero and in the profile menu |
 | `/login`, `/register/donor`, `/register/hospital`, `/forgot-password` | Public (signed-in users are sent home) |
 | `/hospital`, `/hospital/requests`, `/hospital/requests/new`, `/hospital/requests/:id` | Hospital staff (approved hospital; others see its approval progress) |
 | `/donor`, `/donor/requests`, `/donor/history`, `/donor/profile` | Donors |
 | `/admin/hospitals`, `/admin/users`, `/admin/requests`, `/admin/donors` | Admins |
 | `/change-password` | Any signed-in user |
 
-`/` is the public home page for everyone, and every RedLink logo links to it. `RequireAuth` sends signed-out users to `/login?from=…`, users with a temporary password to `/change-password`, and users on another role's page back to their own home. After signing in, users return to the `from` page (only paths on this site are accepted). `HospitalApprovalGate` shows staff of a pending or rejected hospital the approval progress, with the admin's reason if rejected, and re-checks the status when they open a hospital page or press **Check again**. This is for convenience only: the backend's 401 and 403 are the real protection. Pages not built yet show a "coming soon" placeholder.
+`/` is the public home page for everyone, and every RedLink logo links to it. `RequireAuth` sends signed-out users to `/login?from=…`, users with a temporary password to `/change-password`, and users on another role's page back to their own home. After signing in, users return to the `from` page (only paths on this site are accepted). `HospitalApprovalGate` shows staff of a pending or rejected hospital the approval progress, with the admin's reason if rejected, and re-checks the status when they open a hospital page or press **Check again**. This is for convenience only: the backend's 401 and 403 are the real protection.
 
 ### Development tools
 
@@ -459,6 +459,8 @@ Every table has the same toolbar at the top of its panel:
 | Request page: ranked matches | Name, phone, city | Compatible blood group, the request's city only |
 | Donor: donation history | Hospital, city, `RQ-` number | Year (once there are donations in more than one) |
 | Notifications (every role) | Message words, `RQ-` number | Read / unread |
+| Hospital: requests | `RQ-` number, city, staff, blood group | Status, urgency, blood group |
+| Admin: all requests | `RQ-` number, hospital, city, staff | Hospital, city, status, urgency, blood group |
 
 How it behaves:
 
@@ -539,7 +541,7 @@ erDiagram
 | `role` | varchar | | `ADMIN`, `HOSPITAL_STAFF` or `DONOR` |
 | `hospital_id` | bigint | 🔗 hospitals | Only set for hospital staff |
 | `enabled` | boolean | | `false` blocks login |
-| `must_change_password` | boolean | | `true` after an admin sets a temporary password; the user must choose a new one at next login |
+| `must_change_password` | boolean | | `true` for a first password someone else chose (new staff, the startup admin); the user must choose their own at next login |
 | `created_at` | timestamp | | When the account was created |
 
 #### 🏥 hospitals
@@ -869,7 +871,9 @@ Start the backend first (step 4). All endpoints are under `http://localhost:8080
 | `PATCH` | `/api/admin/hospitals/{id}/status` | Admin | `{"status":"APPROVED"}` or `{"status":"REJECTED","reason":"…"}` (reason required, max 500). Only `PENDING` hospitals: a decision is final (`409`) |
 | `GET` | `/api/admin/users?role=&q=` | Admin | Users newest first (max 200); optional role, and `q` matching part of the name or email |
 | `POST` | `/api/admin/users` | Admin | Add `HOSPITAL_STAFF` to an approved hospital with a temporary password; `201` |
-| `PATCH` | `/api/admin/users/{id}/password` | Admin | Set a temporary password (not your own); the user must change it at next sign-in |
+| `GET` | `/api/admin/requests` | Admin | Every hospital's requests, newest first (the newest 500), each with reply and donation counts. Read-only |
+| `GET` | `/api/admin/requests/{id}` | Admin | One request, read-only: hospital contact, notified count, every reply, and who donated |
+| `GET` | `/api/requests` | Hospital | The dashboard numbers (`open`, `criticalOpen`, `fulfilledLast30Days`, `donorsComing`) and every request of your hospital, newest first, with `coming` / `withdrew` / `declined` / `donated` counts |
 | `POST` | `/api/requests` | Hospital (approved) | Post a request: `bloodGroup`, `unitsNeeded` (1–20), `urgency`, `city`, `neededBy` (future ISO time). Notifies the top matches; `201` with the request (`reference` "RQ-12"), `matchCount` and `notifiedCount`. `403` while the hospital isn't approved |
 | `GET` | `/api/requests/{id}` | Hospital | The request, how many donors were notified, and `donatedDonorIds` once fulfilled. Another hospital's request is `404` |
 | `PATCH` | `/api/requests/{id}/status` | Hospital | `{"status":"FULFILLED","donorIds":[…]}` (each must have accepted; records donations) or `{"status":"CANCELLED"}`. Only an `OPEN` request; final |
@@ -961,10 +965,11 @@ The repo includes a ready-made collection in [`postman/`](postman/):
 4. Run anything in the other folders. To act as someone else, run another sign-in request.
    - **4. Admin: hospitals:** run **Pending queue** first; it saves the oldest pending hospital for the details, approve and reject requests.
    - **5. Admin: users:** run **All hospitals** (in 4) first, so **Add staff user** has an approved hospital.
-   - **6. Blood requests:** sign in as approved staff and run **Post a request** first; it saves the request for the view and match requests.
+   - **6. Blood requests:** sign in as approved staff and run **Post a request** first; it saves the request for the view and match requests. **My hospital's requests** shows the dashboard numbers and every request.
    - **7. Donor:** after posting a request in 6, run **Login as donor** (Kamal, O+, who can give to that A+ request), then **Incoming requests**; it saves the requests to accept and decline. Run **Donor replies** in 6 as staff afterwards to see them.
    - **Fulfil and cancel (6):** as Kamal, **Accept** the request (without withdrawing), sign in as approved staff again, then run **Mark fulfilled**. It looks up who accepted and records their donations. **Close again** then expects `409`. **Cancel a request** posts and cancels its own request. As Kamal, **My donation history** (7) then shows the donation.
    - **8. Notifications:** any role. Run **My notifications** after something that notifies you (staff after a donor accepts, Kamal after a request is posted); it saves the first unread one for **Mark one read**.
+   - **9. Admin: requests:** sign in as admin, run **All requests** (saves the newest), then **Request details** for its replies and donations. Read-only.
 
 The registration requests use `{{$timestamp}}`, so each run creates a new account and signs in as it. To use the deployed API later, duplicate the environment and change `baseUrl`. When you add an endpoint, add it to the collection too (export it from Postman over the file in `postman/`).
 
@@ -999,7 +1004,7 @@ cd backend
 | `AuthFlowIntegrationTest` | Registration, login, `/me`, password change and role rules through the whole app with real tokens | ✅ |
 | `RegistrationRollbackTest` | A failure halfway through hospital registration leaves nothing in the database | ✅ |
 | `AdminHospitalIntegrationTest` | The approval queue, hospital details, approve and reject (reason required, decision final), and 403 for non-admins | ✅ |
-| `AdminUserIntegrationTest` | User search and role filter, adding staff (approved hospitals only, unique email), temporary passwords that must be changed | ✅ |
+| `AdminUserIntegrationTest` | User search and role filter, adding staff (approved hospitals only, unique email), a first password that must be changed, and no way for an admin to change anyone's password | ✅ |
 | `JwtServiceTest` | Token contents and lifetime; expired, forged and wrong-issuer tokens are rejected; BCrypt hashing | ❌ |
 | `SecurityRulesTest` | The role rules for `/api/requests`: staff manage requests, donors respond, everyone else gets 403 | ❌ |
 | `CurrentUserTest` | Reading the user from the token; deleted accounts → 401, disabled → 403 | ❌ |
@@ -1022,6 +1027,9 @@ cd backend
 | `DonationHistoryIntegrationTest` | Empty history, newest first with hospital and request, totals and next eligible date, and a fulfilled request showing up the same day | ✅ |
 | `NotificationTriggersIntegrationTest` | Who is told about what: accepts and withdrawals reach every enabled staff member, declines nobody; fulfilled and cancelled messages; hospital decisions | ✅ |
 | `NotificationFeedIntegrationTest` | Your own notifications newest first with the unread count; mark one and all read; someone else's is 404 | ✅ |
+| `RequestExpiryIntegrationTest` | Overdue OPEN requests expire, others are left alone; accepted donors are told; running again changes nothing; expired is final; the job is off in tests | ✅ |
+| `HospitalRequestListIntegrationTest` | The hospital's requests newest first with reply and donation counts; dashboard numbers only count open or recent; only your own | ✅ |
+| `AdminRequestIntegrationTest` | Every hospital's requests with counts; one request with replies in order and donors; admins can't change requests | ✅ |
 
 Tests that need PostgreSQL use the separate `redLink_test` database (create it in [step 2](#2-create-the-database)), with the same user and password as the app. They run inside a transaction that is **rolled back**, use unique `@test.redlink.lk` emails, and keep the admin seeder switched off. Tests use their own JWT secret from `src/test/resources/config/application.properties`.
 
@@ -1053,15 +1061,6 @@ To run only the tests that don't need a database:
 ```bash
 ./mvnw test -Dtest="JwtServiceTest,CurrentUserTest,RegistrationServiceAgeTest,AdminSeederTest,DonorControllerTest,GlobalExceptionHandlerTest,BloodGroupTest,DonorEligibilityTest,SecurityRulesTest,MatchRankingTest,MatchingPropertiesTest"
 ```
-
-### Planned endpoints
-
-| Method | Endpoint | Role | Description |
-|---|---|---|---|
-| `GET` | `/api/requests` | Hospital | The hospital's own requests, with filters and summary counts (Phase 7) |
-| `GET` | `/api/admin/requests`, `/api/admin/requests/{id}` | Admin | Every request across hospitals, read-only (Phase 7) |
-
-All of these will need the header `Authorization: Bearer <token>`.
 
 ---
 
@@ -1155,13 +1154,14 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Change own password (API)
 - [x] Frontend sign-in, registration and change-password pages, and the hospital approval screen
 - [x] Admin approval of hospitals, with rejection reason
-- [x] Admin user management: search users, add staff users, set temporary passwords
+- [x] Admin user management: search users, add staff users (admins can't change anyone's password)
 - [x] Blood requests and the matching engine (post, ranked matches with filters, request page)
 - [x] Configurable notification count (units × urgency multiplier, capped)
 - [x] Donor side: profile, availability, eligibility ring, incoming requests, accept / decline / withdraw, and replies on the hospital's request page
 - [x] Fulfilling and cancelling requests (donations recorded, 90-day clock restarted), and the donor's donation history
 - [x] Notifications: posted, accepted, withdrawn, fulfilled, cancelled and hospital decisions, with a bell and a notifications page
-- [ ] Role-based dashboards in the frontend (placeholders in place)
+- [x] Requests expire automatically after their needed-by time (background job)
+- [x] Hospital dashboard and requests table; admin view of every request (read-only)
 - [ ] Frontend component tests (Vitest + Testing Library)
 - [x] GitHub Actions CI (backend tests + frontend lint/build on every pull request)
 - [x] Branch protection on `main` (pull request + passing CI required)

@@ -20,7 +20,8 @@
     { "key": "requestId", "value": "1", "description": "Set by Post a request" },
     { "key": "acceptRequestId", "value": "1", "description": "Set by Incoming requests (first unanswered)" },
     { "key": "declineRequestId", "value": "1", "description": "Set by Incoming requests (second unanswered)" },
-    { "key": "notificationId", "value": "1", "description": "Set by My notifications (first unread)" }
+    { "key": "notificationId", "value": "1", "description": "Set by My notifications (first unread)" },
+    { "key": "adminRequestId", "value": "1", "description": "Set by All requests (9), the newest request" }
   ],
   "item": [
     {
@@ -422,28 +423,6 @@
             },
             "url": { "raw": "{{baseUrl}}/admin/users", "host": ["{{baseUrl}}"], "path": ["admin", "users"] }
           }
-        },
-        {
-          "name": "Set temporary password",
-          "event": [
-            { "listen": "test", "script": { "type": "text/javascript", "exec": [
-              "pm.test(\"Must change it\", () => {",
-              "  pm.response.to.have.status(200);",
-              "  pm.expect(pm.response.json().mustChangePassword).to.eql(true);",
-              "});"
-            ] } }
-          ],
-          "request": {
-            "description": "For {{userId}}. Their old password stops working; they must choose a new one at their next sign-in. Not allowed on your own account (400).",
-            "method": "PATCH",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"temporaryPassword\": \"Temp-Pass-2026\"\n}",
-              "options": { "raw": { "language": "json" } }
-            },
-            "url": { "raw": "{{baseUrl}}/admin/users/{{userId}}/password", "host": ["{{baseUrl}}"], "path": ["admin", "users", "{{userId}}", "password"] }
-          }
         }
       ]
     },
@@ -665,6 +644,22 @@
             "header": [],
             "body": { "mode": "raw", "raw": "{\n  \"status\": \"CANCELLED\"\n}", "options": { "raw": { "language": "json" } } },
             "url": { "raw": "{{baseUrl}}/requests/{{cancelRequestId}}/status", "host": ["{{baseUrl}}"], "path": ["requests", "{{cancelRequestId}}", "status"] }
+          }
+        },
+        {
+          "name": "My hospital's requests",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "console.log(`${body.open} open (${body.criticalOpen} critical), ${body.donorsComing} donors coming, ${body.fulfilledLast30Days} fulfilled in 30 days.`);"
+            ] } }
+          ],
+          "request": {
+            "description": "The dashboard numbers and every request, newest first, with reply and donation counts.",
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/requests", "host": ["{{baseUrl}}"], "path": ["requests"] }
           }
         }
       ]
@@ -889,6 +884,47 @@
             "method": "PATCH",
             "header": [],
             "url": { "raw": "{{baseUrl}}/notifications/999999999/read", "host": ["{{baseUrl}}"], "path": ["notifications", "999999999", "read"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Admin: requests",
+      "description": "Sign in as admin first. Read-only views of every hospital's requests.",
+      "item": [
+        {
+          "name": "All requests",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const requests = pm.response.json();",
+              "if (requests[0]) pm.collectionVariables.set('adminRequestId', requests[0].id);",
+              "console.log(`${requests.length} requests (newest 500 at most).`);"
+            ] } }
+          ],
+          "request": {
+            "description": "Newest first across every hospital; saves the newest as adminRequestId.",
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/admin/requests", "host": ["{{baseUrl}}"], "path": ["admin", "requests"] }
+          }
+        },
+        {
+          "name": "Request details (read-only)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Has replies and donations', () => {",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.responses).to.be.an('array');",
+              "  pm.expect(body.donatedDonorIds).to.be.an('array');",
+              "});"
+            ] } }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/admin/requests/{{adminRequestId}}", "host": ["{{baseUrl}}"], "path": ["admin", "requests", "{{adminRequestId}}"] }
           }
         }
       ]

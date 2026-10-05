@@ -2,7 +2,10 @@ import { ArrowLeft, KeyRound } from 'lucide-react';
 import { PublicLayout } from '../components/layout/PublicLayout';
 import { LinkButton, Panel } from '../components/ui';
 
-// v1 has no password reset by email: an admin sets a temporary password instead
+/**
+ * Nobody, admins included, can see or change another user's password, and reset by email isn't built yet,
+ * so for now this page can only explain that.
+ */
 export function ForgotPasswordPage() {
   return (
     <PublicLayout>
@@ -13,8 +16,11 @@ export function ForgotPasswordPage() {
           </div>
           <h1 className="font-display text-display-sm text-ink">Forgot your password?</h1>
           <p className="text-body text-text-muted">
-            Contact your RedLink administrator at <a href="mailto:admin@redlink.lk">admin@redlink.lk</a> and
-            they'll set a temporary password for you. You'll choose a new one the next time you sign in.
+            Resetting a password by email isn't available yet. For your security, nobody at RedLink, including
+            administrators, can see or change your password.
+          </p>
+          <p className="text-body text-text-muted">
+            If you can't sign in, contact <a href="mailto:admin@redlink.lk">admin@redlink.lk</a>.
           </p>
           <LinkButton to="/login" variant="outline" leftIcon={<ArrowLeft size={16} aria-hidden="true" />} className="self-start">
             Back to sign in

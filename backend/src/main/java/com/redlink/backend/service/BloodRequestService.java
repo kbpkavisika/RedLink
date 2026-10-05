@@ -3,8 +3,10 @@ package com.redlink.backend.service;
 import com.redlink.backend.config.MatchingProperties;
 import com.redlink.backend.dto.request.BloodRequestDetail;
 import com.redlink.backend.dto.request.CreateBloodRequestRequest;
+import com.redlink.backend.dto.request.HospitalRequestList;
 import com.redlink.backend.dto.request.MatchedDonor;
 import com.redlink.backend.dto.request.PostedRequestResponse;
+import com.redlink.backend.dto.request.RequestListItem;
 import com.redlink.backend.dto.request.RequestOverview;
 import com.redlink.backend.dto.request.RequestResponse;
 import com.redlink.backend.dto.request.UpdateRequestStatusRequest;
@@ -23,6 +25,7 @@ import com.redlink.backend.model.enums.HospitalStatus;
 import com.redlink.backend.model.enums.RequestStatus;
 import com.redlink.backend.model.enums.ResponseStatus;
 import com.redlink.backend.model.enums.Role;
+import com.redlink.backend.model.enums.Urgency;
 import com.redlink.backend.repository.BloodRequestRepository;
 import com.redlink.backend.repository.DonationRepository;
 import com.redlink.backend.repository.DonorResponseRepository;
@@ -33,9 +36,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -108,6 +111,32 @@ public class BloodRequestService {
         notificationService.requestPosted(request, matches.subList(0, notifiedCount).stream().map(Donor::getUser).toList());
 
         return new PostedRequestResponse(BloodRequestDetail.from(request), matches.size(), notifiedCount);
+    }
+
+    /**
+     * H11: every request the staff member's hospital has posted, newest first, each with its reply and donation
+     * counts, plus the dashboard numbers. Three queries in all, however many requests there are.
+     */
+    public HospitalRequestList list() {
+        Hospital hospital = currentUser.require().getHospital();
+        if (hospital == null) {
+            throw new ForbiddenException("Only hospital staff have requests.");
+        }
+        List<RequestListItem> items = RequestLists.build(
+                bloodRequestRepository.findByHospitalNewestFirst(hospital.getId()),
+                donorResponseRepository.countByStatusForHospital(hospital.getId()),
+                donationRepository.countByRequestForHospital(hospital.getId()));
+
+        Instant monthAgo = Instant.now(clock).minus(Duration.ofDays(30));
+        List<RequestListItem> open = items.stream().filter(item -> item.status() == RequestStatus.OPEN).toList();
+        return new HospitalRequestList(
+                open.size(),
+                open.stream().filter(item -> item.urgency() == Urgency.CRITICAL).count(),
+                items.stream()
+                        .filter(item -> item.status() == RequestStatus.FULFILLED && item.closedAt().isAfter(monthAgo))
+                        .count(),
+                open.stream().mapToLong(RequestListItem::coming).sum(),
+                items);
     }
 
     public RequestOverview findById(Long id) {
@@ -208,14 +237,9 @@ public class BloodRequestService {
         ownRequest(id);
         return donorResponseRepository.findByRequestIdWithDonor(id).stream()
                 .map(RequestResponse::from)
-                .sorted(Comparator.comparingInt((RequestResponse response) -> RESPONSE_ORDER.indexOf(response.status()))
-                        .thenComparing(RequestResponse::respondedAt)
-                        .thenComparing(RequestResponse::donorId))
+                .sorted(RequestResponse.ORDER)
                 .toList();
     }
-
-    private static final List<ResponseStatus> RESPONSE_ORDER =
-            List.of(ResponseStatus.ACCEPTED, ResponseStatus.WITHDRAWN, ResponseStatus.DECLINED);
 
     // Staff only see their own hospital's requests; anyone else's is "not found", so ids reveal nothing
     private BloodRequest ownRequest(Long id) {

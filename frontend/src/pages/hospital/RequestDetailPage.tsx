@@ -13,24 +13,17 @@ import {
   StateView,
   Table,
   UrgencyTag,
-  type BadgeTone,
   type Column,
 } from '../../components/ui';
 import { useMatches, useRequest } from '../../hooks/useRequests';
 import { useUrlFilters } from '../../hooks/useUrlFilters';
 import { compatibleDonorGroups } from '../../lib/bloodGroups';
 import { formatBloodGroup, formatInstant } from '../../lib/format';
+import { REQUEST_STATUS } from '../../lib/requestStatus';
 import { matchesQuery } from '../../lib/search';
 import { CloseRequestPanel, type CloseMode } from './CloseRequestPanel';
 import { ResponsesPanel } from './ResponsesPanel';
-import type { ApiError, BloodRequestDetail, MatchedDonor, RequestOverview, RequestStatus } from '../../types';
-
-const STATUS: Record<RequestStatus, { label: string; tone: BadgeTone }> = {
-  OPEN: { label: 'Open', tone: 'info' },
-  FULFILLED: { label: 'Fulfilled', tone: 'success' },
-  CANCELLED: { label: 'Cancelled', tone: 'neutral' },
-  EXPIRED: { label: 'Expired', tone: 'neutral' },
-};
+import type { ApiError, BloodRequestDetail, MatchedDonor, RequestOverview } from '../../types';
 
 const backToRequests = (
   <LinkButton to="/hospital/requests" variant="outline" leftIcon={<ArrowLeft size={16} aria-hidden="true" />}>
@@ -130,7 +123,7 @@ interface RequestSummaryProps {
 
 function RequestSummary({ overview, onClose }: RequestSummaryProps) {
   const { request, notifiedCount, donatedDonorIds } = overview;
-  const status = STATUS[request.status];
+  const status = REQUEST_STATUS[request.status];
   return (
     <Panel padded>
       <div className="flex flex-col gap-5">

@@ -1,10 +1,12 @@
 import clsx from 'clsx';
-import { Menu, Plus, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
-import { Button, LinkButton } from '../ui';
+import { Button } from '../ui';
 import { navigation, pageTitleFor } from './navigation';
+import { homePathFor } from '../../lib/roles';
+import { BackButton } from './BackButton';
 import { NotificationBell } from './NotificationBell';
 import { UserMenu } from './UserMenu';
 
@@ -93,14 +95,11 @@ export function AppShell() {
             <Menu size={18} aria-hidden="true" />
           </Button>
 
+          {/* Back to the previous page; with none in this tab, a page goes to its dashboard and a dashboard to the home page */}
+          <BackButton fallback={pathname === homePathFor(user.role) ? '/' : homePathFor(user.role)} />
+
           <h1 className="min-w-0 flex-1 truncate text-title-md text-ink">{title}</h1>
 
-          {user.role === 'HOSPITAL_STAFF' && pathname !== '/hospital/requests/new' && (
-            <LinkButton to="/hospital/requests/new" size="sm" leftIcon={<Plus size={16} aria-hidden="true" />}>
-              <span className="hidden sm:inline">New request</span>
-              <span className="sm:hidden">New</span>
-            </LinkButton>
-          )}
 
           <NotificationBell />
           <UserMenu />

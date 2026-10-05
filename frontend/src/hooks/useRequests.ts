@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   closeRequest,
   createRequest,
+  getHospitalRequests,
   getMatches,
   getRequest,
   getResponses,
@@ -11,6 +12,7 @@ import {
 import type {
   ApiError,
   CreateBloodRequestRequest,
+  HospitalRequestList,
   MatchedDonor,
   PostedRequestResponse,
   RequestOverview,
@@ -24,7 +26,12 @@ export function useCreateRequest() {
     mutationFn: createRequest,
     onSuccess: ({ request, notifiedCount }) => {
       // The request page opens straight from the success screen, so give it the data already in hand
-      queryClient.setQueryData<RequestOverview>(requestKeys.detail(request.id), { request, notifiedCount, donatedDonorIds: [] });
+      queryClient.setQueryData<RequestOverview>(requestKeys.detail(request.id), {
+        request,
+        notifiedCount,
+        donatedDonorIds: [],
+      });
+      void queryClient.invalidateQueries({ queryKey: requestKeys.list() });
     },
   });
 }
@@ -63,10 +70,20 @@ export function useCloseRequest(id: number) {
       queryClient.setQueryData(requestKeys.detail(id), overview);
       void queryClient.invalidateQueries({ queryKey: [...requestKeys.all, 'matches', id] });
       void queryClient.invalidateQueries({ queryKey: requestKeys.responses(id) });
+      void queryClient.invalidateQueries({ queryKey: requestKeys.list() });
     },
     // 409: someone else closed it first; show what they did
     onError: (error) => {
       if (error.status === 409) void queryClient.invalidateQueries({ queryKey: requestKeys.detail(id) });
     },
+  });
+}
+
+// H11: the dashboard and the requests table share this; it refreshes when replies may have come in
+export function useHospitalRequests() {
+  return useQuery<HospitalRequestList, ApiError>({
+    queryKey: requestKeys.list(),
+    queryFn: getHospitalRequests,
+    refetchInterval: 60_000,
   });
 }
