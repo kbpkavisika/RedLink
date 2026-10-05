@@ -19,7 +19,8 @@
     { "key": "userId", "value": "1", "description": "Set by Search users (first result) and Add staff user" },
     { "key": "requestId", "value": "1", "description": "Set by Post a request" },
     { "key": "acceptRequestId", "value": "1", "description": "Set by Incoming requests (first unanswered)" },
-    { "key": "declineRequestId", "value": "1", "description": "Set by Incoming requests (second unanswered)" }
+    { "key": "declineRequestId", "value": "1", "description": "Set by Incoming requests (second unanswered)" },
+    { "key": "notificationId", "value": "1", "description": "Set by My notifications (first unread)" }
   ],
   "item": [
     {
@@ -823,6 +824,71 @@
             "method": "GET",
             "header": [],
             "url": { "raw": "{{baseUrl}}/donor/donations", "host": ["{{baseUrl}}"], "path": ["donor", "donations"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Notifications",
+      "description": "Any role. Sign in as anyone (1. Sign in) after doing something that notifies them, e.g. staff after a donor accepts in 7, or a donor after a request is posted in 6.",
+      "item": [
+        {
+          "name": "My notifications",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const feed = pm.response.json();",
+              "const first = feed.items.find(n => !n.read) || feed.items[0];",
+              "if (first) pm.collectionVariables.set('notificationId', first.id);",
+              "console.log(`${feed.unreadCount} unread of ${feed.items.length} shown.`);"
+            ] } }
+          ],
+          "request": {
+            "description": "The latest 100, newest first, and the total unread count. Saves the first unread one as notificationId.",
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/notifications", "host": ["{{baseUrl}}"], "path": ["notifications"] }
+          }
+        },
+        {
+          "name": "Mark one read",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Read', () => pm.expect(pm.response.json().read).to.be.true);"
+            ] } }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/notifications/{{notificationId}}/read", "host": ["{{baseUrl}}"], "path": ["notifications", "{{notificationId}}", "read"] }
+          }
+        },
+        {
+          "name": "Mark all read",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "console.log(`${pm.response.json().updated} marked read.`);"
+            ] } }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/notifications/read-all", "host": ["{{baseUrl}}"], "path": ["notifications", "read-all"] }
+          }
+        },
+        {
+          "name": "Unknown or someone else's (404)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status 404', () => pm.response.to.have.status(404));"
+            ] } }
+          ],
+          "request": {
+            "description": "Another user's notification gets the same 404 as one that doesn't exist.",
+            "method": "PATCH",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/notifications/999999999/read", "host": ["{{baseUrl}}"], "path": ["notifications", "999999999", "read"] }
           }
         }
       ]

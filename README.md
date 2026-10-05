@@ -145,7 +145,7 @@ See [Authentication](#authentication) for how tokens and roles work.
 - Only `ACCEPTED` → `WITHDRAWN` is allowed, and only while the request is `OPEN`. `DECLINED` and `WITHDRAWN` are final.
 - Accepting needs the donor to be eligible under the 90-day rule. Declining is always allowed. The availability switch only affects matching, so a paused donor can still reply to a request they see.
 - A request past its needed-by time takes no replies, even before it is marked `EXPIRED`.
-- When a donor withdraws, the hospital's staff are notified ("Kamal Perera can no longer donate for #RQ-5"). *(Notifications phase.)*
+- When a donor accepts or withdraws, the hospital's staff are notified ("Kamal Perera can no longer donate for #RQ-5"). See [Notifications](#notifications).
 
 | Invalid action | API response |
 |---|---|
@@ -156,6 +156,22 @@ See [Authentication](#authentication) for how tokens and roles work.
 | Withdrawing a declined response | `409 Conflict`: "Only accepted responses can be withdrawn." |
 | Withdrawing after the request closed | `409 Conflict`: "This request is already closed." |
 | Withdrawing without having replied | `404 Not Found`: "You haven't responded to this request." |
+
+### Notifications
+
+In-app only: a bell in the top bar with the unread count (checked every 30 seconds) and a full list at `/notifications`. Email and SMS are left for a later version. Every notification is written by `NotificationService` in the same transaction as the change it reports, so a failed change never leaves one behind.
+
+| When | Who is notified | Example |
+|---|---|---|
+| A request is posted | The top matches (units × urgency multiplier, capped) | "Critical: National Hospital Colombo needs 2 units of O- in Colombo. Request #RQ-12." |
+| A donor accepts | Every enabled staff member of the hospital | "Kamal Perera (O+) can donate for #RQ-12. Call 0771234567 to confirm." |
+| A donor withdraws | Every enabled staff member of the hospital | "Kamal Perera can no longer donate for #RQ-12." |
+| A request is fulfilled | Donors recorded as giving blood | "Thank you for donating at National Hospital Colombo (#RQ-12). You can donate again from 4 Jan 2027." |
+| | Donors who accepted but weren't recorded | "#RQ-12 at National Hospital Colombo has been fulfilled. It's no longer needed, thank you for offering to help." |
+| A request is cancelled | Donors who had accepted | "#RQ-12 at National Hospital Colombo was cancelled. It's no longer needed, thank you for offering to help." |
+| A hospital is approved or rejected | That hospital's staff | "National Hospital Colombo was approved. You can now post blood requests." / "… wasn't approved: {reason}" |
+
+Declines aren't reported. Opening a notification marks it read and goes to what it's about: staff to the request page, donors to their requests page (scrolled to it), and anything else, such as a hospital decision, to the dashboard.
 
 ### Matching engine
 
@@ -442,6 +458,7 @@ Every table has the same toolbar at the top of its panel:
 | Request page: donor replies | Name, phone, city | Reply (coming, can't make it, declined) |
 | Request page: ranked matches | Name, phone, city | Compatible blood group, the request's city only |
 | Donor: donation history | Hospital, city, `RQ-` number | Year (once there are donations in more than one) |
+| Notifications (every role) | Message words, `RQ-` number | Read / unread |
 
 How it behaves:
 
@@ -864,6 +881,9 @@ Start the backend first (step 4). All endpoints are under `http://localhost:8080
 | `GET` | `/api/donor/requests` | Donor | Open requests the donor's group can give to, in any city: critical first, then their city, then the soonest deadline. Includes the hospital's address and phone, and `myResponse` |
 | `POST` | `/api/requests/{id}/responses` | Donor | `{"status":"ACCEPTED"}` or `"DECLINED"`, once; `201`. Accepting needs the donor to be eligible (90-day rule) |
 | `PATCH` | `/api/requests/{id}/responses/me` | Donor | `{"status":"WITHDRAWN"}`: only an accepted reply, only while the request is open |
+| `GET` | `/api/notifications` | Signed in | Own notifications: `unreadCount` (all unread) and the latest 100 `items`, newest first, each with `requestId` / `reference` when it's about a request |
+| `PATCH` | `/api/notifications/{id}/read` | Signed in | Mark one read. Someone else's is `404` |
+| `PATCH` | `/api/notifications/read-all` | Signed in | Mark all of your own read; returns `{"updated": n}` |
 | `GET` | `/api/donor/donations` | Donor | `totalDonations`, `totalUnits`, `livesHelped`, `nextEligibleDate`, and every donation newest first (hospital, date, `#RQ-…`, units) |
 
 Everything except register and login needs the header `Authorization: Bearer <token>`.
@@ -944,6 +964,7 @@ The repo includes a ready-made collection in [`postman/`](postman/):
    - **6. Blood requests:** sign in as approved staff and run **Post a request** first; it saves the request for the view and match requests.
    - **7. Donor:** after posting a request in 6, run **Login as donor** (Kamal, O+, who can give to that A+ request), then **Incoming requests**; it saves the requests to accept and decline. Run **Donor replies** in 6 as staff afterwards to see them.
    - **Fulfil and cancel (6):** as Kamal, **Accept** the request (without withdrawing), sign in as approved staff again, then run **Mark fulfilled**. It looks up who accepted and records their donations. **Close again** then expects `409`. **Cancel a request** posts and cancels its own request. As Kamal, **My donation history** (7) then shows the donation.
+   - **8. Notifications:** any role. Run **My notifications** after something that notifies you (staff after a donor accepts, Kamal after a request is posted); it saves the first unread one for **Mark one read**.
 
 The registration requests use `{{$timestamp}}`, so each run creates a new account and signs in as it. To use the deployed API later, duplicate the environment and change `baseUrl`. When you add an endpoint, add it to the collection too (export it from Postman over the file in `postman/`).
 
@@ -999,6 +1020,8 @@ cd backend
 | `DonorResponseIntegrationTest` | Reply once, eligibility to accept, incompatible groups, closed requests, withdraw rules, and the hospital's ordered list of replies | ✅ |
 | `CloseBloodRequestIntegrationTest` | Fulfilling records one donation per donor and restarts their 90-day clock; only accepted donors; cancelling records none; closing is final | ✅ |
 | `DonationHistoryIntegrationTest` | Empty history, newest first with hospital and request, totals and next eligible date, and a fulfilled request showing up the same day | ✅ |
+| `NotificationTriggersIntegrationTest` | Who is told about what: accepts and withdrawals reach every enabled staff member, declines nobody; fulfilled and cancelled messages; hospital decisions | ✅ |
+| `NotificationFeedIntegrationTest` | Your own notifications newest first with the unread count; mark one and all read; someone else's is 404 | ✅ |
 
 Tests that need PostgreSQL use the separate `redLink_test` database (create it in [step 2](#2-create-the-database)), with the same user and password as the app. They run inside a transaction that is **rolled back**, use unique `@test.redlink.lk` emails, and keep the admin seeder switched off. Tests use their own JWT secret from `src/test/resources/config/application.properties`.
 
@@ -1035,8 +1058,6 @@ To run only the tests that don't need a database:
 
 | Method | Endpoint | Role | Description |
 |---|---|---|---|
-| `GET` | `/api/notifications` | Signed in | Own notifications, newest first (Phase 6) |
-| `PATCH` | `/api/notifications/{id}/read`, `/api/notifications/read-all` | Signed in | Mark one or all as read (Phase 6) |
 | `GET` | `/api/requests` | Hospital | The hospital's own requests, with filters and summary counts (Phase 7) |
 | `GET` | `/api/admin/requests`, `/api/admin/requests/{id}` | Admin | Every request across hospitals, read-only (Phase 7) |
 
@@ -1139,7 +1160,7 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Configurable notification count (units × urgency multiplier, capped)
 - [x] Donor side: profile, availability, eligibility ring, incoming requests, accept / decline / withdraw, and replies on the hospital's request page
 - [x] Fulfilling and cancelling requests (donations recorded, 90-day clock restarted), and the donor's donation history
-- [ ] Notifications
+- [x] Notifications: posted, accepted, withdrawn, fulfilled, cancelled and hospital decisions, with a bell and a notifications page
 - [ ] Role-based dashboards in the frontend (placeholders in place)
 - [ ] Frontend component tests (Vitest + Testing Library)
 - [x] GitHub Actions CI (backend tests + frontend lint/build on every pull request)
