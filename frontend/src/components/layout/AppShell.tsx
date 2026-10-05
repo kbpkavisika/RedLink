@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
 import { Button, LinkButton } from '../ui';
+import { homePathFor } from '../../lib/roles';
 import { navigation, pageTitleFor } from './navigation';
 import { UserMenu } from './UserMenu';
 
@@ -47,7 +48,7 @@ export function AppShell() {
         )}
       >
         <div className="flex h-16 items-center justify-between px-5">
-          <Link to="/" aria-label="RedLink home" onClick={() => setMenuOpen(false)}>
+          <Link to={homePathFor(user.role)} aria-label="Your dashboard" onClick={() => setMenuOpen(false)}>
             <img src="/brand/redlink-logo.svg" alt="RedLink" className="h-7" />
           </Link>
           <Button variant="icon" aria-label="Close menu" className="lg:hidden" onClick={() => setMenuOpen(false)}>
