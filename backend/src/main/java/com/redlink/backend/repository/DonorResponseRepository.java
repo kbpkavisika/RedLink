@@ -29,4 +29,12 @@ public interface DonorResponseRepository extends JpaRepository<DonorResponse, Lo
             where r.request.hospital.id = :hospitalId
             group by r.request.id, r.status""")
     List<ResponseStatusCount> countByStatusForHospital(Long hospitalId);
+
+    // The same, for any set of requests (the admin's list across hospitals)
+    @Query("""
+            select new com.redlink.backend.repository.ResponseStatusCount(r.request.id, r.status, count(r))
+            from DonorResponse r
+            where r.request.id in :requestIds
+            group by r.request.id, r.status""")
+    List<ResponseStatusCount> countByStatusForRequests(Collection<Long> requestIds);
 }

@@ -39,7 +39,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -238,14 +237,9 @@ public class BloodRequestService {
         ownRequest(id);
         return donorResponseRepository.findByRequestIdWithDonor(id).stream()
                 .map(RequestResponse::from)
-                .sorted(Comparator.comparingInt((RequestResponse response) -> RESPONSE_ORDER.indexOf(response.status()))
-                        .thenComparing(RequestResponse::respondedAt)
-                        .thenComparing(RequestResponse::donorId))
+                .sorted(RequestResponse.ORDER)
                 .toList();
     }
-
-    private static final List<ResponseStatus> RESPONSE_ORDER =
-            List.of(ResponseStatus.ACCEPTED, ResponseStatus.WITHDRAWN, ResponseStatus.DECLINED);
 
     // Staff only see their own hospital's requests; anyone else's is "not found", so ids reveal nothing
     private BloodRequest ownRequest(Long id) {

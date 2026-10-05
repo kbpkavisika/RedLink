@@ -5,6 +5,7 @@ import com.redlink.backend.model.enums.BloodGroup;
 import com.redlink.backend.model.enums.RequestStatus;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -41,6 +42,12 @@ public interface BloodRequestRepository extends JpaRepository<BloodRequest, Long
             where r.hospital.id = :hospitalId
             order by r.createdAt desc, r.id desc""")
     List<BloodRequest> findByHospitalNewestFirst(Long hospitalId);
+
+    // Every hospital's requests, newest first (A7), up to a limit
+    @Query("""
+            select r from BloodRequest r join fetch r.createdBy join fetch r.hospital
+            order by r.createdAt desc, r.id desc""")
+    List<BloodRequest> findAllNewestFirst(Limit limit);
 
     // A donor's incoming requests (D5): still OPEN, not yet past their deadline, for a group the donor can give to
     @Query("""
