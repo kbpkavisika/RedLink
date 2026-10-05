@@ -5,7 +5,7 @@ import { RedirectIfAuthenticated } from './auth/RedirectIfAuthenticated';
 import { RequireAuth } from './auth/RequireAuth';
 import { AppShell } from './components/layout/AppShell';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
-import { ComingSoonPage } from './pages/ComingSoonPage';
+import { AdminRequestsPage } from './pages/admin/AdminRequestsPage';
 import { DonorsPage } from './pages/admin/DonorsPage';
 import { DonorHistoryPage } from './pages/donor/DonorHistoryPage';
 import { DonorHomePage } from './pages/donor/DonorHomePage';
@@ -29,7 +29,7 @@ import { RequestDetailPage } from './pages/hospital/RequestDetailPage';
 const ComponentGallery = import.meta.env.DEV ? lazy(() => import('./dev/ComponentGallery')) : null;
 
 /*
- * Route map. Placeholders (ComingSoonPage) are replaced by real pages in the feature branches.
+ * Route map.
  *   everyone          /  (home page; signed-in users get "Go to dashboard")
  *   public            /login, /register/*, /forgot-password
  *   any signed-in     /change-password, /notifications
@@ -97,7 +97,7 @@ export default function App() {
               <Route path="/admin/users" element={<UsersPage />} />
               <Route
                 path="/admin/requests"
-                element={<ComingSoonPage title="All requests" description="Requests across every hospital." />}
+                element={<AdminRequestsPage />}
               />
               <Route path="/admin/donors" element={<DonorsPage />} />
             </Route>

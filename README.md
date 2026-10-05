@@ -130,7 +130,7 @@ See [Authentication](#authentication) for how tokens and roles work.
 - Staff close a request with `PATCH /api/requests/{id}/status`. Closing is final: a closed request can't be reopened (`409`), and it takes no more replies.
 - **Fulfilling** names the donors who actually gave blood, chosen from those who **accepted**. Each gets a `donations` row (today, 1 unit) and their `last_donation_date` becomes today, which restarts their 90-day clock: they drop out of matching and can't accept again until it's over.
 - **Cancelling** records no donations.
-- `EXPIRED` is set by the system when the needed-by time passes, never by staff *(expiry job: Phase 7)*.
+- `EXPIRED` is set by the system, never by staff: a background job (`RequestExpiryScheduler`) expires every `OPEN` request whose needed-by time has passed. It runs once at startup, to catch up after downtime, then again `redlink.expiry.interval` (default 5 minutes) after each run. Donors who had accepted are told it's no longer needed. A request someone is replying to or closing at that moment is skipped and picked up next run. Set `redlink.expiry.enabled=false` to switch the job off (the tests do).
 - Closing locks the request row, as replying does, so a donor can't accept in the middle of a hospital closing the request.
 
 ### Donor response lifecycle
@@ -428,7 +428,7 @@ Every data view shows one of six states, all from `StateView`:
 | `/admin/hospitals`, `/admin/users`, `/admin/requests`, `/admin/donors` | Admins |
 | `/change-password` | Any signed-in user |
 
-`/` is the public home page for everyone, and every RedLink logo links to it. `RequireAuth` sends signed-out users to `/login?from=…`, users with a temporary password to `/change-password`, and users on another role's page back to their own home. After signing in, users return to the `from` page (only paths on this site are accepted). `HospitalApprovalGate` shows staff of a pending or rejected hospital the approval progress, with the admin's reason if rejected, and re-checks the status when they open a hospital page or press **Check again**. This is for convenience only: the backend's 401 and 403 are the real protection. Pages not built yet show a "coming soon" placeholder.
+`/` is the public home page for everyone, and every RedLink logo links to it. `RequireAuth` sends signed-out users to `/login?from=…`, users with a temporary password to `/change-password`, and users on another role's page back to their own home. After signing in, users return to the `from` page (only paths on this site are accepted). `HospitalApprovalGate` shows staff of a pending or rejected hospital the approval progress, with the admin's reason if rejected, and re-checks the status when they open a hospital page or press **Check again**. This is for convenience only: the backend's 401 and 403 are the real protection.
 
 ### Development tools
 
@@ -459,6 +459,8 @@ Every table has the same toolbar at the top of its panel:
 | Request page: ranked matches | Name, phone, city | Compatible blood group, the request's city only |
 | Donor: donation history | Hospital, city, `RQ-` number | Year (once there are donations in more than one) |
 | Notifications (every role) | Message words, `RQ-` number | Read / unread |
+| Hospital: requests | `RQ-` number, city, staff, blood group | Status, urgency, blood group |
+| Admin: all requests | `RQ-` number, hospital, city, staff | Hospital, city, status, urgency, blood group |
 
 How it behaves:
 
@@ -870,6 +872,9 @@ Start the backend first (step 4). All endpoints are under `http://localhost:8080
 | `GET` | `/api/admin/users?role=&q=` | Admin | Users newest first (max 200); optional role, and `q` matching part of the name or email |
 | `POST` | `/api/admin/users` | Admin | Add `HOSPITAL_STAFF` to an approved hospital with a temporary password; `201` |
 | `PATCH` | `/api/admin/users/{id}/password` | Admin | Set a temporary password (not your own); the user must change it at next sign-in |
+| `GET` | `/api/admin/requests` | Admin | Every hospital's requests, newest first (the newest 500), each with reply and donation counts. Read-only |
+| `GET` | `/api/admin/requests/{id}` | Admin | One request, read-only: hospital contact, notified count, every reply, and who donated |
+| `GET` | `/api/requests` | Hospital | The dashboard numbers (`open`, `criticalOpen`, `fulfilledLast30Days`, `donorsComing`) and every request of your hospital, newest first, with `coming` / `withdrew` / `declined` / `donated` counts |
 | `POST` | `/api/requests` | Hospital (approved) | Post a request: `bloodGroup`, `unitsNeeded` (1–20), `urgency`, `city`, `neededBy` (future ISO time). Notifies the top matches; `201` with the request (`reference` "RQ-12"), `matchCount` and `notifiedCount`. `403` while the hospital isn't approved |
 | `GET` | `/api/requests/{id}` | Hospital | The request, how many donors were notified, and `donatedDonorIds` once fulfilled. Another hospital's request is `404` |
 | `PATCH` | `/api/requests/{id}/status` | Hospital | `{"status":"FULFILLED","donorIds":[…]}` (each must have accepted; records donations) or `{"status":"CANCELLED"}`. Only an `OPEN` request; final |
@@ -961,10 +966,11 @@ The repo includes a ready-made collection in [`postman/`](postman/):
 4. Run anything in the other folders. To act as someone else, run another sign-in request.
    - **4. Admin: hospitals:** run **Pending queue** first; it saves the oldest pending hospital for the details, approve and reject requests.
    - **5. Admin: users:** run **All hospitals** (in 4) first, so **Add staff user** has an approved hospital.
-   - **6. Blood requests:** sign in as approved staff and run **Post a request** first; it saves the request for the view and match requests.
+   - **6. Blood requests:** sign in as approved staff and run **Post a request** first; it saves the request for the view and match requests. **My hospital's requests** shows the dashboard numbers and every request.
    - **7. Donor:** after posting a request in 6, run **Login as donor** (Kamal, O+, who can give to that A+ request), then **Incoming requests**; it saves the requests to accept and decline. Run **Donor replies** in 6 as staff afterwards to see them.
    - **Fulfil and cancel (6):** as Kamal, **Accept** the request (without withdrawing), sign in as approved staff again, then run **Mark fulfilled**. It looks up who accepted and records their donations. **Close again** then expects `409`. **Cancel a request** posts and cancels its own request. As Kamal, **My donation history** (7) then shows the donation.
    - **8. Notifications:** any role. Run **My notifications** after something that notifies you (staff after a donor accepts, Kamal after a request is posted); it saves the first unread one for **Mark one read**.
+   - **9. Admin: requests:** sign in as admin, run **All requests** (saves the newest), then **Request details** for its replies and donations. Read-only.
 
 The registration requests use `{{$timestamp}}`, so each run creates a new account and signs in as it. To use the deployed API later, duplicate the environment and change `baseUrl`. When you add an endpoint, add it to the collection too (export it from Postman over the file in `postman/`).
 
@@ -1022,6 +1028,9 @@ cd backend
 | `DonationHistoryIntegrationTest` | Empty history, newest first with hospital and request, totals and next eligible date, and a fulfilled request showing up the same day | ✅ |
 | `NotificationTriggersIntegrationTest` | Who is told about what: accepts and withdrawals reach every enabled staff member, declines nobody; fulfilled and cancelled messages; hospital decisions | ✅ |
 | `NotificationFeedIntegrationTest` | Your own notifications newest first with the unread count; mark one and all read; someone else's is 404 | ✅ |
+| `RequestExpiryIntegrationTest` | Overdue OPEN requests expire, others are left alone; accepted donors are told; running again changes nothing; expired is final; the job is off in tests | ✅ |
+| `HospitalRequestListIntegrationTest` | The hospital's requests newest first with reply and donation counts; dashboard numbers only count open or recent; only your own | ✅ |
+| `AdminRequestIntegrationTest` | Every hospital's requests with counts; one request with replies in order and donors; admins can't change requests | ✅ |
 
 Tests that need PostgreSQL use the separate `redLink_test` database (create it in [step 2](#2-create-the-database)), with the same user and password as the app. They run inside a transaction that is **rolled back**, use unique `@test.redlink.lk` emails, and keep the admin seeder switched off. Tests use their own JWT secret from `src/test/resources/config/application.properties`.
 
@@ -1053,15 +1062,6 @@ To run only the tests that don't need a database:
 ```bash
 ./mvnw test -Dtest="JwtServiceTest,CurrentUserTest,RegistrationServiceAgeTest,AdminSeederTest,DonorControllerTest,GlobalExceptionHandlerTest,BloodGroupTest,DonorEligibilityTest,SecurityRulesTest,MatchRankingTest,MatchingPropertiesTest"
 ```
-
-### Planned endpoints
-
-| Method | Endpoint | Role | Description |
-|---|---|---|---|
-| `GET` | `/api/requests` | Hospital | The hospital's own requests, with filters and summary counts (Phase 7) |
-| `GET` | `/api/admin/requests`, `/api/admin/requests/{id}` | Admin | Every request across hospitals, read-only (Phase 7) |
-
-All of these will need the header `Authorization: Bearer <token>`.
 
 ---
 
@@ -1161,7 +1161,8 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Donor side: profile, availability, eligibility ring, incoming requests, accept / decline / withdraw, and replies on the hospital's request page
 - [x] Fulfilling and cancelling requests (donations recorded, 90-day clock restarted), and the donor's donation history
 - [x] Notifications: posted, accepted, withdrawn, fulfilled, cancelled and hospital decisions, with a bell and a notifications page
-- [ ] Role-based dashboards in the frontend (placeholders in place)
+- [x] Requests expire automatically after their needed-by time (background job)
+- [x] Hospital dashboard and requests table; admin view of every request (read-only)
 - [ ] Frontend component tests (Vitest + Testing Library)
 - [x] GitHub Actions CI (backend tests + frontend lint/build on every pull request)
 - [x] Branch protection on `main` (pull request + passing CI required)
