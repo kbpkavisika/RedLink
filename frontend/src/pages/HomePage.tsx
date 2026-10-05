@@ -13,6 +13,7 @@ import {
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
+import { UserMenu } from '../components/layout/UserMenu';
 import { LinkButton } from '../components/ui';
 import { homePathFor } from '../lib/roles';
 
@@ -84,8 +85,8 @@ function SiteHeader() {
           </a>
         </nav>
         <div className="flex items-center gap-3">
-          {user && <span className="hidden text-label text-text-muted sm:inline">Signed in as {user.fullName}</span>}
           <AccountActions />
+          {user && <UserMenu />}
         </div>
       </div>
     </header>
