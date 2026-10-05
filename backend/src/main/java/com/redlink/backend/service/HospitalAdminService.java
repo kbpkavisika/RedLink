@@ -32,13 +32,15 @@ public class HospitalAdminService {
 
     private final HospitalRepository hospitalRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
     private final CurrentUser currentUser;
     private final Clock clock;
 
     public HospitalAdminService(HospitalRepository hospitalRepository, UserRepository userRepository,
-                                CurrentUser currentUser, Clock clock) {
+                                NotificationService notificationService, CurrentUser currentUser, Clock clock) {
         this.hospitalRepository = hospitalRepository;
         this.userRepository = userRepository;
+        this.notificationService = notificationService;
         this.currentUser = currentUser;
         this.clock = clock;
     }
@@ -80,6 +82,7 @@ public class HospitalAdminService {
         hospital.setApprovedBy(currentUser.require());
         hospital.setApprovedAt(Instant.now(clock));
         hospitalRepository.flush(); // surface a CHECK-constraint problem here, not after the response
+        notificationService.hospitalDecided(hospital);
 
         return HospitalDetail.from(hospital, userRepository.findAllByHospitalIdOrderByCreatedAtAsc(id));
     }

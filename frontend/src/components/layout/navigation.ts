@@ -46,6 +46,7 @@ const extraTitles: { pattern: string; title: string }[] = [
   { pattern: '/hospital/requests/new', title: 'New request' },
   { pattern: '/hospital/requests/:id', title: 'Request detail' },
   { pattern: '/change-password', title: 'Change password' },
+  { pattern: '/notifications', title: 'Notifications' },
 ];
 
 // The top bar title for the current page

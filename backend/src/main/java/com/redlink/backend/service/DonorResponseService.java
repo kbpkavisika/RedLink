@@ -33,7 +33,7 @@ import java.util.Locale;
  *              └──► DECLINED
  *
  * One reply per donor per request (UNIQUE request_id + donor_id); withdrawing updates that row.
- * DECLINED and WITHDRAWN are final. Notifying the hospital about replies comes with notifications.
+ * DECLINED and WITHDRAWN are final. The hospital's staff are notified when a donor accepts or withdraws.
  */
 @Service
 @Transactional(readOnly = true)
@@ -44,13 +44,16 @@ public class DonorResponseService {
     private final DonorSelfService donorSelfService;
     private final BloodRequestRepository bloodRequestRepository;
     private final DonorResponseRepository donorResponseRepository;
+    private final NotificationService notificationService;
     private final Clock clock;
 
     public DonorResponseService(DonorSelfService donorSelfService, BloodRequestRepository bloodRequestRepository,
-                                DonorResponseRepository donorResponseRepository, Clock clock) {
+                                DonorResponseRepository donorResponseRepository, NotificationService notificationService,
+                                Clock clock) {
         this.donorSelfService = donorSelfService;
         this.bloodRequestRepository = bloodRequestRepository;
         this.donorResponseRepository = donorResponseRepository;
+        this.notificationService = notificationService;
         this.clock = clock;
     }
 
@@ -89,6 +92,9 @@ public class DonorResponseService {
             // Two replies at the same moment: UNIQUE (request_id, donor_id) kept only the first
             throw new ConflictException("You've already responded to this request.");
         }
+        if (body.status() == ResponseStatus.ACCEPTED) {
+            notificationService.donorAccepted(request, donor);
+        }
         return toIncoming(request, donor, response);
     }
 
@@ -109,6 +115,7 @@ public class DonorResponseService {
 
         response.setStatus(ResponseStatus.WITHDRAWN);
         donorResponseRepository.saveAndFlush(response); // sets updatedAt
+        notificationService.donorWithdrew(request, donor);
         return toIncoming(request, donor, response);
     }
 

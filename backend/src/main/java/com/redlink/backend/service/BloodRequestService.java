@@ -17,7 +17,6 @@ import com.redlink.backend.model.Donation;
 import com.redlink.backend.model.Donor;
 import com.redlink.backend.model.DonorResponse;
 import com.redlink.backend.model.Hospital;
-import com.redlink.backend.model.Notification;
 import com.redlink.backend.model.User;
 import com.redlink.backend.model.enums.BloodGroup;
 import com.redlink.backend.model.enums.HospitalStatus;
@@ -52,7 +51,7 @@ import java.util.stream.Collectors;
  *   save request (OPEN) → rank matches → notify the top N → 201 with counts
  *
  * Staff also see their request's ranked matches (H5, H12) and donors' replies (H7).
- * Only donors are notified now; hospital-side notifications come with the notifications phase.
+ * Notifications (posted, closed) are written by NotificationService in the same transaction.
  */
 @Service
 @Transactional(readOnly = true)
@@ -63,6 +62,7 @@ public class BloodRequestService {
     private final DonorResponseRepository donorResponseRepository;
     private final DonationRepository donationRepository;
     private final MatchingService matchingService;
+    private final NotificationService notificationService;
     private final MatchingProperties matchingProperties;
     private final CurrentUser currentUser;
     private final Clock clock;
@@ -70,12 +70,14 @@ public class BloodRequestService {
     public BloodRequestService(BloodRequestRepository bloodRequestRepository,
                                NotificationRepository notificationRepository, DonorResponseRepository donorResponseRepository,
                                DonationRepository donationRepository, MatchingService matchingService,
+                               NotificationService notificationService,
                                MatchingProperties matchingProperties, CurrentUser currentUser, Clock clock) {
         this.bloodRequestRepository = bloodRequestRepository;
         this.notificationRepository = notificationRepository;
         this.donorResponseRepository = donorResponseRepository;
         this.donationRepository = donationRepository;
         this.matchingService = matchingService;
+        this.notificationService = notificationService;
         this.matchingProperties = matchingProperties;
         this.currentUser = currentUser;
         this.clock = clock;
@@ -103,10 +105,7 @@ public class BloodRequestService {
 
         List<Donor> matches = matchingService.findMatchingDonors(request);
         int notifiedCount = matchingProperties.notifiedCount(request.getUnitsNeeded(), request.getUrgency(), matches.size());
-        String message = notificationMessage(request);
-        notificationRepository.saveAll(matches.subList(0, notifiedCount).stream()
-                .map(donor -> notification(donor.getUser(), request, message))
-                .toList());
+        notificationService.requestPosted(request, matches.subList(0, notifiedCount).stream().map(Donor::getUser).toList());
 
         return new PostedRequestResponse(BloodRequestDetail.from(request), matches.size(), notifiedCount);
     }
@@ -157,32 +156,36 @@ public class BloodRequestService {
             throw new ConflictException("This request is already closed.");
         }
 
+        Map<Long, Donor> accepted = donorResponseRepository.findByRequestIdWithDonor(request.getId()).stream()
+                .filter(response -> response.getStatus() == ResponseStatus.ACCEPTED)
+                .collect(Collectors.toMap(response -> response.getDonor().getId(), DonorResponse::getDonor));
+        LocalDate today = LocalDate.now(clock);
+
+        Set<Long> donated = Set.of();
         if (body.status() == RequestStatus.FULFILLED) {
-            recordDonations(request, body.donorIds());
+            donated = recordDonations(request, body.donorIds(), accepted, today);
         } else if (!body.donorIds().isEmpty()) {
             throw new BadRequestException("A cancelled request has no donations.", "donorIds", "must be empty when cancelling");
         }
 
         request.setStatus(body.status());
         request.setClosedAt(Instant.now(clock));
+        notificationService.requestClosed(request, accepted.values(), donated, DonorEligibility.nextEligibleDate(today));
         return overview(request);
     }
 
-    private void recordDonations(BloodRequest request, List<Long> donorIds) {
+    // Returns the ids of the donors recorded as having given blood
+    private Set<Long> recordDonations(BloodRequest request, List<Long> donorIds, Map<Long, Donor> accepted, LocalDate today) {
         Set<Long> picked = new LinkedHashSet<>(donorIds);
         if (picked.isEmpty()) {
             throw new BadRequestException("Choose at least one donor who gave blood, or cancel the request instead.",
                     "donorIds", "must include at least one donor");
         }
-        Map<Long, Donor> accepted = donorResponseRepository.findByRequestIdWithDonor(request.getId()).stream()
-                .filter(response -> response.getStatus() == ResponseStatus.ACCEPTED)
-                .collect(Collectors.toMap(response -> response.getDonor().getId(), DonorResponse::getDonor));
         if (!accepted.keySet().containsAll(picked)) {
             throw new BadRequestException("Only donors who accepted this request can be marked as having donated.",
                     "donorIds", "must all have accepted this request");
         }
 
-        LocalDate today = LocalDate.now(clock);
         donationRepository.saveAll(picked.stream().map(donorId -> {
             Donor donor = accepted.get(donorId);
             donor.setLastDonationDate(today); // restarts their 90-day clock; saved when the transaction commits
@@ -194,6 +197,7 @@ public class BloodRequestService {
             donation.setUnits(1);
             return donation;
         }).toList());
+        return picked;
     }
 
     /**
@@ -242,31 +246,5 @@ public class BloodRequestService {
             throw new ForbiddenException("Your hospital's registration wasn't approved, so it can't post requests.");
         }
         return hospital;
-    }
-
-    // e.g. "Urgent: National Hospital Colombo needs 2 units of O+ in Colombo. Request #RQ-1043."
-    static String notificationMessage(BloodRequest request) {
-        String prefix = switch (request.getUrgency()) {
-            case CRITICAL -> "Critical: ";
-            case HIGH -> "Urgent: ";
-            case LOW, MEDIUM -> "";
-        };
-        int units = request.getUnitsNeeded();
-        return "%s%s needs %d %s of %s in %s. Request #%s.".formatted(
-                prefix,
-                request.getHospital().getName(),
-                units,
-                units == 1 ? "unit" : "units",
-                request.getBloodGroup().getLabel(),
-                request.getCity(),
-                BloodRequestDetail.reference(request.getId()));
-    }
-
-    private static Notification notification(User user, BloodRequest request, String message) {
-        Notification notification = new Notification();
-        notification.setUser(user);
-        notification.setRequest(request);
-        notification.setMessage(message);
-        return notification;
     }
 }

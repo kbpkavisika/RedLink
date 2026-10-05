@@ -13,6 +13,7 @@ import {
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
+import { NotificationBell } from '../components/layout/NotificationBell';
 import { UserMenu } from '../components/layout/UserMenu';
 import { LinkButton } from '../components/ui';
 import { homePathFor } from '../lib/roles';
@@ -86,6 +87,7 @@ function SiteHeader() {
         </nav>
         <div className="flex items-center gap-3">
           <AccountActions />
+          {user && <NotificationBell />}
           {user && <UserMenu />}
         </div>
       </div>
