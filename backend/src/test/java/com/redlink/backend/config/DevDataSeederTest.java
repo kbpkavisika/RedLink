@@ -13,6 +13,7 @@ import com.redlink.backend.support.IntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Clock;
@@ -40,9 +41,13 @@ class DevDataSeederTest {
     @Autowired private ApplicationContext context;
 
     private DevDataSeeder seeder(String password) {
+        return seeder(password, new MockEnvironment());
+    }
+
+    private DevDataSeeder seeder(String password, MockEnvironment environment) {
         Clock clock = Clock.fixed(Instant.parse("2026-09-30T06:00:00Z"), ZoneOffset.UTC);
         return new DevDataSeeder(userRepository, hospitalRepository, donorRepository, passwordEncoder,
-                new SeedProperties(true, password), clock);
+                new SeedProperties(true, password), clock, environment);
     }
 
     private List<User> seededUsers() {
@@ -60,6 +65,16 @@ class DevDataSeederTest {
     @Test
     void isOffUnlessEnabled() {
         assertThat(context.getBeanNamesForType(DevDataSeeder.class)).isEmpty();
+    }
+
+    @Test
+    void refusesToStartInProduction() {
+        MockEnvironment production = new MockEnvironment();
+        production.setActiveProfiles("prod");
+
+        assertThatThrownBy(() -> seeder(PASSWORD, production))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("never run in production");
     }
 
     @Test

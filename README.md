@@ -777,7 +777,10 @@ The rest of the settings are in `application.properties`:
 |---|---|
 | Database URL | `jdbc:postgresql://localhost:5432/redLink` |
 | Username | `postgres` |
-| API port | `8080` |
+| API port | `8080`, or the `PORT` environment variable when the host sets one |
+| Health check | `GET /actuator/health` (public, says only `UP` or `DOWN`; nothing else under `/actuator` is exposed) |
+
+**Production profile.** When deployed, set `SPRING_PROFILES_ACTIVE=prod`. [`application-prod.properties`](backend/src/main/resources/application-prod.properties) turns SQL logging off, uses a small database pool, trusts the host's proxy headers and keeps the sample data off (the app refuses to start if it's switched on). Every secret comes from environment variables; the file lists them.
 
 ### 4. Start the backend
 
