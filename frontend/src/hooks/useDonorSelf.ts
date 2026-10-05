@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { donorSelfKeys, getIncomingRequests, getMyProfile, setMyAvailability } from '../api/donor';
+import {
+  donorSelfKeys,
+  getIncomingRequests,
+  getMyProfile,
+  respondToRequest,
+  setMyAvailability,
+  withdrawResponse,
+} from '../api/donor';
 import type { ApiError, DonorProfile, IncomingRequest } from '../types';
 
 export function useMyProfile() {
@@ -8,6 +15,37 @@ export function useMyProfile() {
 
 export function useIncomingRequests() {
   return useQuery<IncomingRequest[], ApiError>({ queryKey: donorSelfKeys.incoming(), queryFn: getIncomingRequests });
+}
+
+// Replaces one request in the cached list with the server's answer, so the page updates without a reload
+function useReplaceIncoming() {
+  const queryClient = useQueryClient();
+  return {
+    replace: (updated: IncomingRequest) =>
+      queryClient.setQueryData<IncomingRequest[]>(donorSelfKeys.incoming(), (list) =>
+        list?.map((request) => (request.requestId === updated.requestId ? updated : request)),
+      ),
+    // A 409 means the list is out of date (closed, or answered in another tab): reload it
+    refresh: () => void queryClient.invalidateQueries({ queryKey: donorSelfKeys.incoming() }),
+  };
+}
+
+export function useRespond() {
+  const { replace, refresh } = useReplaceIncoming();
+  return useMutation<IncomingRequest, ApiError, { requestId: number; status: 'ACCEPTED' | 'DECLINED' }>({
+    mutationFn: ({ requestId, status }) => respondToRequest(requestId, status),
+    onSuccess: replace,
+    onError: (error) => error.status === 409 && refresh(),
+  });
+}
+
+export function useWithdraw() {
+  const { replace, refresh } = useReplaceIncoming();
+  return useMutation<IncomingRequest, ApiError, number>({
+    mutationFn: withdrawResponse,
+    onSuccess: replace,
+    onError: (error) => error.status === 409 && refresh(),
+  });
 }
 
 /**
