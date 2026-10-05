@@ -6,6 +6,8 @@ interface LinkButtonProps extends LinkProps {
   variant?: Exclude<ButtonVariant, 'icon'>;
   size?: ButtonSize;
   leftIcon?: ReactNode;
+  // After the label, e.g. an arrow on "Go to dashboard"
+  rightIcon?: ReactNode;
   fullWidth?: boolean;
 }
 
@@ -14,6 +16,7 @@ export function LinkButton({
   variant = 'primary',
   size = 'md',
   leftIcon,
+  rightIcon,
   fullWidth = false,
   className,
   children,
@@ -23,6 +26,7 @@ export function LinkButton({
     <Link className={buttonClasses(variant, size, fullWidth, typeof className === 'string' ? className : undefined)} {...rest}>
       {leftIcon}
       {children}
+      {rightIcon}
     </Link>
   );
 }

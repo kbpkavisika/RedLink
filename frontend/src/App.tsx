@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { HospitalApprovalGate } from './auth/HospitalApprovalGate';
 import { RedirectIfAuthenticated } from './auth/RedirectIfAuthenticated';
 import { RequireAuth } from './auth/RequireAuth';
-import { RoleRedirect } from './auth/RoleRedirect';
 import { AppShell } from './components/layout/AppShell';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
@@ -14,6 +13,7 @@ import { DonorRequestsPage } from './pages/donor/DonorRequestsPage';
 import { HospitalsPage } from './pages/admin/HospitalsPage';
 import { UsersPage } from './pages/admin/UsersPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { RegisterDonorPage } from './pages/RegisterDonorPage';
@@ -26,6 +26,7 @@ const ComponentGallery = import.meta.env.DEV ? lazy(() => import('./dev/Componen
 
 /*
  * Route map. Placeholders (ComingSoonPage) are replaced by real pages in the feature branches.
+ *   everyone          /  (home page; signed-in users get "Go to dashboard")
  *   public            /login, /register/*, /forgot-password
  *   any signed-in     /change-password
  *   HOSPITAL_STAFF    /hospital/*
@@ -36,7 +37,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<RoleRedirect />} />
+        <Route path="/" element={<HomePage />} />
 
         {/* Public: signed-in users are sent to their home instead */}
         <Route element={<RedirectIfAuthenticated />}>

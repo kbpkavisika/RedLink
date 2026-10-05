@@ -10,7 +10,9 @@ export function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="grid min-h-screen bg-surface lg:grid-cols-[640px_1fr]">
       <aside className="relative hidden overflow-hidden bg-ink p-14 text-white lg:flex lg:flex-col lg:justify-between">
-        <img src="/brand/redlink-logo-reversed.svg" alt="RedLink" className="relative h-8 self-start" />
+        <Link to="/" aria-label="RedLink home" className="relative self-start">
+          <img src="/brand/redlink-logo-reversed.svg" alt="RedLink" className="h-8" />
+        </Link>
 
         <div className="relative flex max-w-[440px] flex-col gap-4">
           <h2 className="font-display text-display-xl">Stop calling donors one by one.</h2>

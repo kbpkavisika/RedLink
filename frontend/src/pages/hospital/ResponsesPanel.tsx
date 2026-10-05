@@ -1,8 +1,24 @@
 import { MessageSquare, Phone } from 'lucide-react';
-import { Badge, BloodGroupBadge, Panel, StateView, Table, type BadgeTone, type Column } from '../../components/ui';
+import {
+  Badge,
+  BloodGroupBadge,
+  Button,
+  FilterBar,
+  FilterSelect,
+  Panel,
+  SearchInput,
+  StateView,
+  Table,
+  type BadgeTone,
+  type Column,
+} from '../../components/ui';
 import { useResponses } from '../../hooks/useRequests';
+import { useUrlFilters } from '../../hooks/useUrlFilters';
 import { formatInstant } from '../../lib/format';
+import { matchesQuery } from '../../lib/search';
 import type { BloodRequestDetail, RequestResponse, ResponseStatus } from '../../types';
+
+const REPLY_FILTERS = ['rq', 'reply'] as const;
 
 const STATUS: Record<ResponseStatus, { label: string; tone: BadgeTone }> = {
   ACCEPTED: { label: 'Coming', tone: 'success' },
@@ -65,9 +81,15 @@ const columns: Column<RequestResponse>[] = [
  */
 export function ResponsesPanel({ request, notifiedCount }: { request: BloodRequestDetail; notifiedCount: number }) {
   const { data: responses, isPending, isError, error, refetch } = useResponses(request.id);
+  // Own URL keys, so they don't clash with the match list's search on the same page
+  const filters = useUrlFilters(REPLY_FILTERS);
+  const { rq, reply } = filters.values;
 
   const count = (status: ResponseStatus) => responses?.filter((response) => response.status === status).length ?? 0;
   const coming = count('ACCEPTED');
+  const rows = (responses ?? []).filter(
+    (response) => (!reply || response.status === reply) && matchesQuery(rq, response.name, response.phone, response.city),
+  );
 
   return (
     <Panel
@@ -82,10 +104,41 @@ export function ResponsesPanel({ request, notifiedCount }: { request: BloodReque
         )
       }
     >
+      {responses && responses.length > 0 && (
+        <FilterBar shown={rows.length} total={responses.length} active={filters.active} onClear={filters.clear}>
+          <SearchInput
+            label="Search donor replies"
+            placeholder="Donor name or phone"
+            value={rq}
+            onChange={(value) => filters.set('rq', value)}
+          />
+          <FilterSelect
+            label="Reply"
+            allLabel="All replies"
+            value={reply}
+            onChange={(value) => filters.set('reply', value)}
+            options={(Object.keys(STATUS) as ResponseStatus[]).map((status) => ({
+              value: status,
+              label: STATUS[status].label,
+            }))}
+          />
+        </FilterBar>
+      )}
       {isPending ? (
         <StateView state="loading" rows={2} />
       ) : isError ? (
         <StateView state="error" title="We couldn't load replies" error={error} onRetry={() => void refetch()} />
+      ) : responses.length > 0 && rows.length === 0 ? (
+        <StateView
+          state="no-results"
+          title={reply ? `No "${STATUS[reply as ResponseStatus].label}" replies match` : 'No replies match'}
+          description="Try another name, or clear the filters to see every reply."
+          action={
+            <Button variant="outline" onClick={filters.clear}>
+              Clear filters
+            </Button>
+          }
+        />
       ) : responses.length === 0 ? (
         <StateView
           state="empty"
@@ -100,7 +153,7 @@ export function ResponsesPanel({ request, notifiedCount }: { request: BloodReque
       ) : (
         <Table
           caption={`Donor replies to #${request.reference}`}
-          rows={responses}
+          rows={rows}
           rowKey={(response) => response.donorId}
           columns={columns}
         />
