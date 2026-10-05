@@ -170,3 +170,31 @@
     background-position: -100% 0;
   }
 }
+
+/* People who ask their system for less motion get none: spinners, slide-ins, fades and transitions all stop */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * A small control (✕ on a chip, "Generate new") keeps its look but gets a tap area of at least 36px:
+ * class="hit-target" on the button, which must also be positioned (relative or absolute).
+ */
+@utility hit-target {
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 36px);
+    height: max(100%, 36px);
+    transform: translate(-50%, -50%);
+  }
+}

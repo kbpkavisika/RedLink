@@ -1,9 +1,9 @@
 import clsx from 'clsx';
 import { Menu, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
-import { Button } from '../ui';
+import { Button, Panel, StateView } from '../ui';
 import { navigation, pageTitleFor } from './navigation';
 import { homePathFor } from '../../lib/roles';
 import { BackButton } from './BackButton';
@@ -36,6 +36,13 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
+      {/* First thing a keyboard user reaches: jump past the sidebar and top bar */}
+      <a
+        href="#main-content"
+        className="sr-only z-50 rounded-md bg-ink px-4 py-2 text-label font-semibold text-white focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+      >
+        Skip to main content
+      </a>
       {/* Dimmed backdrop behind the mobile menu */}
       {menuOpen && (
         <div className="fixed inset-0 z-30 bg-ink/40 lg:hidden" aria-hidden="true" onClick={() => setMenuOpen(false)} />
@@ -105,8 +112,17 @@ export function AppShell() {
           <UserMenu />
         </header>
 
-        <main className="mx-auto w-full max-w-[1312px] flex-1 px-4 py-6 sm:px-8 lg:py-8">
-          <Outlet />
+        <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1312px] flex-1 px-4 py-6 focus:outline-none sm:px-8 lg:py-8">
+          {/* While a page downloads the first time, the sidebar and top bar stay and only this area waits */}
+          <Suspense
+            fallback={
+              <Panel>
+                <StateView state="loading" rows={4} />
+              </Panel>
+            }
+          >
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

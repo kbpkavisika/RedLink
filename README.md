@@ -439,7 +439,7 @@ With `npm run dev`, **http://localhost:5173/dev/components** shows every compone
 1. **API function** in `src/api/` (e.g. `getRequests()`), plus query keys.
 2. **Query hook** in `src/hooks/` typed with `ApiError`: `useQuery<BloodRequest[], ApiError>(…)`.
 3. **Page** in `src/pages/<role>/` using `Panel` + `FilterBar` + `Table` and a `StateView` for loading, error, empty and no results. [`DonorsPage`](frontend/src/pages/admin/DonorsPage.tsx) is the reference.
-4. **Route** in [`App.tsx`](frontend/src/App.tsx) inside the right role group; add a sidebar link in [`navigation.ts`](frontend/src/components/layout/navigation.ts) if it needs one.
+4. **Route** in [`App.tsx`](frontend/src/App.tsx) inside the right role group. Load the page with `const XPage = page(() => import('./pages/…/XPage'), 'XPage')` so it is only downloaded when opened; add a sidebar link in [`navigation.ts`](frontend/src/components/layout/navigation.ts) if it needs one.
 5. **Types** in `src/types/index.ts`, matching the backend DTO exactly.
 
 ### Table search and filters

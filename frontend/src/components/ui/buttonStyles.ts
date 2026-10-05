@@ -11,7 +11,7 @@ const variants: Record<ButtonVariant, string> = {
   // Secondary / back actions
   outline: 'border border-border-strong bg-surface text-ink hover:bg-bg hover:text-ink',
   // Tertiary actions that read like a link
-  text: 'text-primary hover:text-primary-hover',
+  text: 'min-h-9 text-primary hover:text-primary-hover', // 36px tall, so it's easy to tap
   icon: 'size-9 rounded-md text-text-muted hover:bg-bg hover:text-ink',
 };
 
