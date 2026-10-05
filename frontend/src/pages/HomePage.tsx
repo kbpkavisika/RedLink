@@ -74,13 +74,13 @@ function SiteHeader() {
         </Link>
         <nav aria-label="Site" className="hidden items-center gap-6 text-label font-medium md:flex">
           <a href="#how-it-works" className="text-text-muted no-underline hover:text-ink">
-            How it works
+            About
           </a>
           <a href="#donors" className="text-text-muted no-underline hover:text-ink">
-            For donors
+            Donors
           </a>
           <a href="#hospitals" className="text-text-muted no-underline hover:text-ink">
-            For hospitals
+            Hospitals
           </a>
         </nav>
         <div className="flex items-center gap-3">
