@@ -202,7 +202,13 @@ export interface PostedRequestResponse {
 export interface RequestOverview {
   request: BloodRequestDetail;
   notifiedCount: number;
+  donatedDonorIds: number[]; // donors who gave blood; empty until FULFILLED
 }
+
+// PATCH /api/requests/{id}/status: close an OPEN request. Final either way.
+export type UpdateRequestStatusRequest =
+  | { status: 'FULFILLED'; donorIds: number[] } // donors who gave blood; each must have accepted
+  | { status: 'CANCELLED' };
 
 // ---- Donor self-service (backend: dto/donor) ----
 
@@ -247,6 +253,26 @@ export interface IncomingRequest {
   sameCity: boolean; // the request is in the donor's city
   myResponse: ResponseStatus | null; // null = not answered yet
   respondedAt: string | null;
+}
+
+// GET /api/donor/donations (D10)
+export interface DonationHistory {
+  totalDonations: number;
+  totalUnits: number;
+  livesHelped: number; // one per donation
+  eligible: boolean;
+  nextEligibleDate: string | null; // ISO date; only while not eligible
+  donations: DonationItem[]; // newest first
+}
+
+export interface DonationItem {
+  id: number;
+  donationDate: string; // ISO date
+  units: number;
+  hospitalName: string;
+  hospitalCity: string;
+  requestId: number | null; // null for a donation not linked to a request
+  reference: string | null; // "RQ-12"
 }
 
 // One row of GET /api/requests/{id}/responses (hospital staff), accepted first

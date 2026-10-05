@@ -5,6 +5,7 @@ import type {
   PostedRequestResponse,
   RequestOverview,
   RequestResponse,
+  UpdateRequestStatusRequest,
 } from '../types';
 import api from './client';
 
@@ -42,5 +43,11 @@ export async function getMatches(id: number, filters: MatchFilters = {}): Promis
 // H7: donors' replies, accepted first
 export async function getResponses(id: number): Promise<RequestResponse[]> {
   const { data } = await api.get<RequestResponse[]>(`/requests/${id}/responses`);
+  return data;
+}
+
+// H8, H9: fulfil (with the donors who gave blood) or cancel. 409 if it's already closed.
+export async function closeRequest(id: number, body: UpdateRequestStatusRequest): Promise<RequestOverview> {
+  const { data } = await api.patch<RequestOverview>(`/requests/${id}/status`, body);
   return data;
 }

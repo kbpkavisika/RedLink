@@ -26,7 +26,15 @@ const STATUS: Record<ResponseStatus, { label: string; tone: BadgeTone }> = {
   DECLINED: { label: 'Declined', tone: 'neutral' },
 };
 
-const columns: Column<RequestResponse>[] = [
+// After the request is fulfilled, "Coming" becomes what actually happened
+const OUTCOME = {
+  DONATED: { label: 'Donated', tone: 'success' },
+  DIDNT_DONATE: { label: "Didn't donate", tone: 'neutral' },
+} satisfies Record<string, { label: string; tone: BadgeTone }>;
+
+type Row = RequestResponse & { badge: { label: string; tone: BadgeTone } };
+
+const columns: Column<Row>[] = [
   {
     key: 'donor',
     header: 'Donor',
@@ -43,7 +51,7 @@ const columns: Column<RequestResponse>[] = [
   {
     key: 'status',
     header: 'Reply',
-    cell: (response) => <Badge tone={STATUS[response.status].tone}>{STATUS[response.status].label}</Badge>,
+    cell: (response) => <Badge tone={response.badge.tone}>{response.badge.label}</Badge>,
   },
   {
     key: 'when',
@@ -79,17 +87,35 @@ const columns: Column<RequestResponse>[] = [
  * H7 on the request page: who is coming, who can't make it after all, and who declined.
  * Checks for new replies every 30 seconds while the page is open.
  */
-export function ResponsesPanel({ request, notifiedCount }: { request: BloodRequestDetail; notifiedCount: number }) {
+interface ResponsesPanelProps {
+  request: BloodRequestDetail;
+  notifiedCount: number;
+  // Donors recorded as having given blood (once the request is FULFILLED)
+  donatedDonorIds: number[];
+}
+
+export function ResponsesPanel({ request, notifiedCount, donatedDonorIds }: ResponsesPanelProps) {
   const { data: responses, isPending, isError, error, refetch } = useResponses(request.id);
   // Own URL keys, so they don't clash with the match list's search on the same page
   const filters = useUrlFilters(REPLY_FILTERS);
   const { rq, reply } = filters.values;
+  const fulfilled = request.status === 'FULFILLED';
 
   const count = (status: ResponseStatus) => responses?.filter((response) => response.status === status).length ?? 0;
   const coming = count('ACCEPTED');
-  const rows = (responses ?? []).filter(
-    (response) => (!reply || response.status === reply) && matchesQuery(rq, response.name, response.phone, response.city),
-  );
+  const rows: Row[] = (responses ?? [])
+    .filter(
+      (response) => (!reply || response.status === reply) && matchesQuery(rq, response.name, response.phone, response.city),
+    )
+    .map((response) => ({
+      ...response,
+      badge:
+        fulfilled && response.status === 'ACCEPTED'
+          ? donatedDonorIds.includes(response.donorId)
+            ? OUTCOME.DONATED
+            : OUTCOME.DIDNT_DONATE
+          : STATUS[response.status],
+    }));
 
   return (
     <Panel
@@ -98,8 +124,11 @@ export function ResponsesPanel({ request, notifiedCount }: { request: BloodReque
         responses &&
         responses.length > 0 && (
           <span className="text-label text-text-subtle">
-            <strong className="text-ink">{coming} coming</strong> for {request.unitsNeeded}{' '}
-            {request.unitsNeeded === 1 ? 'unit' : 'units'} · {count('WITHDRAWN')} withdrew · {count('DECLINED')} declined
+            <strong className="text-ink">
+              {fulfilled ? `${donatedDonorIds.length} donated` : `${coming} coming`}
+            </strong>{' '}
+            for {request.unitsNeeded} {request.unitsNeeded === 1 ? 'unit' : 'units'} · {count('WITHDRAWN')} withdrew ·{' '}
+            {count('DECLINED')} declined
           </span>
         )
       }

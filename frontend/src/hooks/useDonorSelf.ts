@@ -2,13 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   donorSelfKeys,
   getIncomingRequests,
+  getMyDonations,
   getMyProfile,
   respondToRequest,
   setMyAvailability,
   updateMyProfile,
   withdrawResponse,
 } from '../api/donor';
-import type { ApiError, DonorProfile, IncomingRequest, UpdateDonorProfileRequest } from '../types';
+import type { ApiError, DonationHistory, DonorProfile, IncomingRequest, UpdateDonorProfileRequest } from '../types';
 
 export function useMyProfile() {
   return useQuery<DonorProfile, ApiError>({ queryKey: donorSelfKeys.profile(), queryFn: getMyProfile });
@@ -20,6 +21,10 @@ export function useUpdateProfile() {
     mutationFn: updateMyProfile,
     onSuccess: (profile) => queryClient.setQueryData(donorSelfKeys.profile(), profile),
   });
+}
+
+export function useMyDonations() {
+  return useQuery<DonationHistory, ApiError>({ queryKey: donorSelfKeys.donations(), queryFn: getMyDonations });
 }
 
 export function useIncomingRequests() {

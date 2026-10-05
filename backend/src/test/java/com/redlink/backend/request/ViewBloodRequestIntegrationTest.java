@@ -79,7 +79,8 @@ class ViewBloodRequestIntegrationTest {
                 .andExpect(jsonPath("$.request.reference").value("RQ-" + id))
                 .andExpect(jsonPath("$.request.bloodGroup").value("B-"))
                 .andExpect(jsonPath("$.request.hospitalName").value(staff.getHospital().getName()))
-                .andExpect(jsonPath("$.notifiedCount").value(2));
+                .andExpect(jsonPath("$.notifiedCount").value(2))
+                .andExpect(jsonPath("$.donatedDonorIds").isEmpty());
     }
 
     @Test

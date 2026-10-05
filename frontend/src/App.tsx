@@ -7,6 +7,7 @@ import { AppShell } from './components/layout/AppShell';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
 import { DonorsPage } from './pages/admin/DonorsPage';
+import { DonorHistoryPage } from './pages/donor/DonorHistoryPage';
 import { DonorHomePage } from './pages/donor/DonorHomePage';
 import { DonorProfilePage } from './pages/donor/DonorProfilePage';
 import { DonorRequestsPage } from './pages/donor/DonorRequestsPage';
@@ -79,7 +80,7 @@ export default function App() {
               />
               <Route
                 path="/donor/history"
-                element={<ComingSoonPage title="Donation history" description="Every donation you've made." />}
+                element={<DonorHistoryPage />}
               />
               <Route
                 path="/donor/profile"
