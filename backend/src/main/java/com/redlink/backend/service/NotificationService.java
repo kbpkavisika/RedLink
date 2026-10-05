@@ -30,6 +30,7 @@ import java.util.Set;
  *   donor withdraws       → the hospital's staff
  *   request fulfilled     → donors who gave: thanks; donors who accepted but didn't give: no longer needed
  *   request cancelled     → donors who had accepted
+ *   request expired       → donors who had accepted     (RequestExpiryService)
  *   hospital decided      → that hospital's staff         (approved, or rejected with the reason)
  *
  * Declines aren't reported, to keep the noise down. In-app only for now; email/SMS would be a later addition.
@@ -88,6 +89,9 @@ public class NotificationService {
             String message;
             if (request.getStatus() == RequestStatus.CANCELLED) {
                 message = "#%s at %s was cancelled. It's no longer needed, thank you for offering to help."
+                        .formatted(reference(request), hospital);
+            } else if (request.getStatus() == RequestStatus.EXPIRED) {
+                message = "#%s at %s has expired. It's no longer needed, thank you for offering to help."
                         .formatted(reference(request), hospital);
             } else if (donated.contains(donor.getId())) {
                 message = "Thank you for donating at %s (#%s). You can donate again from %s."

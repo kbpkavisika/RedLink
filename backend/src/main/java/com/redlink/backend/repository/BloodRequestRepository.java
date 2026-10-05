@@ -4,9 +4,11 @@ import com.redlink.backend.model.BloodRequest;
 import com.redlink.backend.model.enums.BloodGroup;
 import com.redlink.backend.model.enums.RequestStatus;
 import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -23,6 +25,15 @@ public interface BloodRequestRepository extends JpaRepository<BloodRequest, Long
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from BloodRequest r where r.id = :id")
     Optional<BloodRequest> findByIdForUpdate(Long id);
+
+    /**
+     * OPEN requests whose needed-by time has passed, locked for the expiry job. SKIP LOCKED: a request that a
+     * donor or staff member is busy with right now is left for the next run instead of waiting on it.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2"))
+    @Query("select r from BloodRequest r where r.status = :status and r.neededBy <= :now order by r.id")
+    List<BloodRequest> findOverdueForUpdate(RequestStatus status, Instant now);
 
     // A donor's incoming requests (D5): still OPEN, not yet past their deadline, for a group the donor can give to
     @Query("""
