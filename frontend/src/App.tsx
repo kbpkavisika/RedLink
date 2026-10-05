@@ -20,6 +20,8 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { RegisterDonorPage } from './pages/RegisterDonorPage';
 import { RegisterHospitalPage } from './pages/RegisterHospitalPage';
+import { HospitalDashboardPage } from './pages/hospital/HospitalDashboardPage';
+import { HospitalRequestsPage } from './pages/hospital/HospitalRequestsPage';
 import { NewRequestPage } from './pages/hospital/NewRequestPage';
 import { RequestDetailPage } from './pages/hospital/RequestDetailPage';
 
@@ -60,11 +62,11 @@ export default function App() {
               <Route element={<HospitalApprovalGate />}>
                 <Route
                   path="/hospital"
-                  element={<ComingSoonPage title="Your dashboard" description="Open requests and responses at a glance." />}
+                  element={<HospitalDashboardPage />}
                 />
                 <Route
                   path="/hospital/requests"
-                  element={<ComingSoonPage title="Requests" description="Every request your hospital has posted." />}
+                  element={<HospitalRequestsPage />}
                 />
                 <Route path="/hospital/requests/new" element={<NewRequestPage />} />
                 <Route path="/hospital/requests/:id" element={<RequestDetailPage />} />

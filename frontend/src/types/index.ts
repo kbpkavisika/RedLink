@@ -287,6 +287,47 @@ export interface RequestResponse {
   updatedAt: string;
 }
 
+// One row of a request list: GET /api/requests (hospital) and GET /api/admin/requests (admin)
+export interface RequestListItem {
+  id: number;
+  reference: string;
+  bloodGroup: BloodGroup;
+  unitsNeeded: number;
+  urgency: Urgency;
+  city: string;
+  status: RequestStatus;
+  neededBy: string;
+  createdAt: string;
+  closedAt: string | null;
+  createdBy: string;
+  hospitalId: number;
+  hospitalName: string;
+  coming: number; // accepted and not withdrawn
+  withdrew: number;
+  declined: number;
+  donated: number; // donations recorded when fulfilled
+}
+
+// GET /api/requests (H11): the hospital's dashboard numbers and every request, newest first
+export interface HospitalRequestList {
+  open: number;
+  criticalOpen: number;
+  fulfilledLast30Days: number;
+  donorsComing: number; // on open requests
+  requests: RequestListItem[];
+}
+
+// GET /api/admin/requests/{id} (A8): read-only
+export interface AdminRequestDetail {
+  request: BloodRequestDetail;
+  hospitalId: number;
+  hospitalCity: string;
+  hospitalPhone: string;
+  notifiedCount: number;
+  responses: RequestResponse[];
+  donatedDonorIds: number[];
+}
+
 // One row of GET /api/requests/{id}/matches, best match first
 export interface MatchedDonor {
   donorId: number;

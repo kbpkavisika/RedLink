@@ -1,6 +1,7 @@
 import type {
   BloodGroup,
   CreateBloodRequestRequest,
+  HospitalRequestList,
   MatchedDonor,
   PostedRequestResponse,
   RequestOverview,
@@ -17,6 +18,7 @@ export interface MatchFilters {
 // TanStack Query keys for blood requests, so posting or closing one refreshes exactly what changed
 export const requestKeys = {
   all: ['requests'] as const,
+  list: () => [...requestKeys.all, 'list'] as const,
   detail: (id: number) => [...requestKeys.all, 'detail', id] as const,
   matches: (id: number, filters: MatchFilters = {}) => [...requestKeys.all, 'matches', id, filters] as const,
   responses: (id: number) => [...requestKeys.all, 'responses', id] as const,
@@ -49,5 +51,11 @@ export async function getResponses(id: number): Promise<RequestResponse[]> {
 // H8, H9: fulfil (with the donors who gave blood) or cancel. 409 if it's already closed.
 export async function closeRequest(id: number, body: UpdateRequestStatusRequest): Promise<RequestOverview> {
   const { data } = await api.patch<RequestOverview>(`/requests/${id}/status`, body);
+  return data;
+}
+
+// H11: the hospital's requests with reply counts, and the dashboard numbers
+export async function getHospitalRequests(): Promise<HospitalRequestList> {
+  const { data } = await api.get<HospitalRequestList>('/requests');
   return data;
 }
