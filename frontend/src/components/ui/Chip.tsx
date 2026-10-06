@@ -16,7 +16,7 @@ export function Chip({ label, onRemove }: ChipProps) {
           type="button"
           onClick={onRemove}
           aria-label={`Remove filter ${label}`}
-          className="-mr-1 inline-flex size-5 items-center justify-center rounded-full hover:bg-primary/10 focus-visible:shadow-focus focus-visible:outline-none"
+          className="hit-target relative -mr-1 inline-flex size-5 items-center justify-center rounded-full hover:bg-primary/10 focus-visible:shadow-focus focus-visible:outline-none"
         >
           <X size={14} aria-hidden="true" />
         </button>

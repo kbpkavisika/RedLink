@@ -66,6 +66,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register/**").permitAll()
                         .requestMatchers("/error").permitAll()
+                        // The host's health check; says only UP or DOWN
+                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/donor/**").hasRole("DONOR")
                         .requestMatchers("/api/donors/**").hasRole("ADMIN")

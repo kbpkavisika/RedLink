@@ -439,15 +439,15 @@ These patterns come from the mobile mockup but are specified for the **web dashb
 
 ## 9. Accessibility checklist
 
-- [ ] Visible focus on every interactive element (`--ring-focus` plus a `primary` border).
-- [ ] Icon-only buttons have `aria-label`. Decorative SVGs have `aria-hidden="true"`.
-- [ ] Loading containers use `aria-busy="true"`, errors use `role="alert"` and success uses `role="status"`.
-- [ ] Switches use `role="switch"` and `aria-checked`. Nav uses `aria-current="page"`.
-- [ ] Status is never conveyed by colour alone (always text or an icon).
-- [ ] Shimmer and animations stop under `prefers-reduced-motion`.
-- [ ] Body text is at least 14px and captions at least 12px. `text-subtle` is only used on `surface`/`bg`.
-- [ ] Form fields have real `<label>`s and `autocomplete`, and errors use `aria-describedby`.
-- [ ] Hit targets are at least 36px (buttons 38–48px).
+- [x] Visible focus on every interactive element (`--ring-focus` plus a `primary` border).
+- [x] Icon-only buttons have `aria-label`. Decorative SVGs have `aria-hidden="true"`.
+- [x] Loading containers use `aria-busy="true"`, errors use `role="alert"` and success uses `role="status"`.
+- [x] Switches use `role="switch"` and `aria-checked`. Nav uses `aria-current="page"`.
+- [x] Status is never conveyed by colour alone (always text or an icon).
+- [x] Shimmer and animations stop under `prefers-reduced-motion`.
+- [x] Body text is at least 14px and captions at least 12px. `text-subtle` is only used on `surface`/`bg`.
+- [x] Form fields have real `<label>`s and `autocomplete`, and errors use `aria-describedby`.
+- [x] Hit targets are at least 36px (buttons 38–48px).
 
 ---
 

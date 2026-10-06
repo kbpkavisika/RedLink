@@ -67,7 +67,7 @@ export function NotificationBell() {
         {unread > 0 && (
           <span
             aria-hidden="true"
-            className="absolute top-1 right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[11px] leading-none font-semibold text-white ring-2 ring-surface"
+            className="absolute top-1 right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-caption leading-none font-semibold text-white ring-2 ring-surface"
           >
             {unread > 99 ? '99+' : unread}
           </span>
@@ -87,7 +87,7 @@ export function NotificationBell() {
               <button
                 type="button"
                 onClick={() => markAllRead.mutate()}
-                className="inline-flex items-center gap-1 text-label font-semibold text-primary hover:text-primary-hover"
+                className="hit-target relative inline-flex items-center gap-1 text-label font-semibold text-primary hover:text-primary-hover"
               >
                 <CheckCheck size={14} aria-hidden="true" />
                 Mark all as read

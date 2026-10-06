@@ -148,7 +148,7 @@ export function AddStaffPanel({ onClose }: { onClose: () => void }) {
           labelAction={
             <button
               type="button"
-              className="text-primary hover:text-primary-hover"
+              className="hit-target relative text-primary hover:text-primary-hover"
               onClick={() => setValue('temporaryPassword', generateTemporaryPassword(), { shouldValidate: true })}
             >
               Generate new

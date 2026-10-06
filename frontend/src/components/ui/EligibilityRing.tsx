@@ -41,7 +41,7 @@ export function EligibilityRing({ daysSinceLastDonation, daysBetweenDonations, e
         <span className="font-mono text-label font-medium text-ink">
           {daysSinceLastDonation === null ? '—' : Math.min(daysSinceLastDonation, 999)}
         </span>
-        <span className="text-[10px] text-text-subtle">days</span>
+        <span className="text-caption leading-none text-text-subtle">days</span>
       </span>
     </div>
   );

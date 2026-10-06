@@ -14,6 +14,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,7 +30,8 @@ import java.util.Locale;
  * one staff user each, and 20 donors across every blood group and five cities. Every account uses
  * redlink.seed.password and has an @seed.redlink.lk email.
  *
- * Runs only with redlink.seed.enabled=true (application-local.properties). Safe to leave on: anything
+ * Runs only with redlink.seed.enabled=true (application-local.properties), and refuses to start under the
+ * prod profile. Safe to leave on locally: anything
  * that already exists is skipped, so restarting doesn't create duplicates. Donation dates are relative
  * to today, so the 90-day rule splits the donors the same way whenever you run it.
  */
@@ -80,7 +83,12 @@ public class DevDataSeeder implements ApplicationRunner {
 
     public DevDataSeeder(UserRepository userRepository, HospitalRepository hospitalRepository,
                          DonorRepository donorRepository, PasswordEncoder passwordEncoder,
-                         SeedProperties properties, Clock clock) {
+                         SeedProperties properties, Clock clock, Environment environment) {
+        // Sample accounts share one known password: they must never exist on the live site
+        if (environment.acceptsProfiles(Profiles.of("prod"))) {
+            throw new IllegalStateException(
+                    "redlink.seed.enabled=true under the prod profile. Sample data must never run in production.");
+        }
         this.userRepository = userRepository;
         this.hospitalRepository = hospitalRepository;
         this.donorRepository = donorRepository;

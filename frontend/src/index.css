@@ -22,6 +22,8 @@
   --color-primary-subtle: #FEF2F3;
   --color-primary-ring: rgba(208, 42, 63, 0.18);
   --color-primary-on-dark: #F29BA4;
+  /* Glows and gradients on dark surfaces only (hero, CTA band); never for text on white */
+  --color-primary-glow: #E0354D;
 
   /* Neutrals (warm) */
   --color-ink: #1A1514;
@@ -109,6 +111,10 @@
   --shadow-urgent: 0 6px 16px -4px rgba(179, 23, 47, 0.2);
   --shadow-halo-success: 0 0 0 10px var(--color-success-halo);
   --shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.2);
+  /* Marketing pages only: lifted cards and the hero mock-up */
+  --shadow-card: 0 1px 2px rgba(26, 21, 20, 0.04), 0 12px 32px -12px rgba(26, 21, 20, 0.14);
+  --shadow-float: 0 30px 80px -20px rgba(0, 0, 0, 0.55);
+  --shadow-glow: 0 10px 30px -8px rgba(224, 53, 77, 0.55);
 }
 
 @layer base {
@@ -168,5 +174,107 @@
   }
   100% {
     background-position: -100% 0;
+  }
+}
+
+/* Faint square grid for dark hero backgrounds, faded out towards the edges */
+@utility bg-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 100%);
+}
+
+/* Red gradient text for one or two highlighted words in a dark heading */
+@utility text-gradient-red {
+  background: linear-gradient(100deg, #F29BA4 0%, #E0354D 55%, #F29BA4 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradient-pan 6s ease-in-out infinite;
+}
+
+/* Gentle bob for floating mock-up cards */
+@utility animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Fades and lifts into place on load; stagger with style={{ animationDelay }} */
+@utility animate-rise {
+  animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Sections fade up as they scroll into view, where the browser supports scroll-driven animation.
+   Elsewhere they are simply visible. */
+@utility reveal {
+  @supports (animation-timeline: view()) {
+    animation: rise linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes gradient-pan {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* People who ask their system for less motion get none: spinners, slide-ins, fades and transitions all stop */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * A small control (✕ on a chip, "Generate new") keeps its look but gets a tap area of at least 36px:
+ * class="hit-target" on the button, which must also be positioned (relative or absolute).
+ */
+@utility hit-target {
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 36px);
+    height: max(100%, 36px);
+    transform: translate(-50%, -50%);
   }
 }

@@ -439,7 +439,7 @@ With `npm run dev`, **http://localhost:5173/dev/components** shows every compone
 1. **API function** in `src/api/` (e.g. `getRequests()`), plus query keys.
 2. **Query hook** in `src/hooks/` typed with `ApiError`: `useQuery<BloodRequest[], ApiError>(…)`.
 3. **Page** in `src/pages/<role>/` using `Panel` + `FilterBar` + `Table` and a `StateView` for loading, error, empty and no results. [`DonorsPage`](frontend/src/pages/admin/DonorsPage.tsx) is the reference.
-4. **Route** in [`App.tsx`](frontend/src/App.tsx) inside the right role group; add a sidebar link in [`navigation.ts`](frontend/src/components/layout/navigation.ts) if it needs one.
+4. **Route** in [`App.tsx`](frontend/src/App.tsx) inside the right role group. Load the page with `const XPage = page(() => import('./pages/…/XPage'), 'XPage')` so it is only downloaded when opened; add a sidebar link in [`navigation.ts`](frontend/src/components/layout/navigation.ts) if it needs one.
 5. **Types** in `src/types/index.ts`, matching the backend DTO exactly.
 
 ### Table search and filters
@@ -777,7 +777,10 @@ The rest of the settings are in `application.properties`:
 |---|---|
 | Database URL | `jdbc:postgresql://localhost:5432/redLink` |
 | Username | `postgres` |
-| API port | `8080` |
+| API port | `8080`, or the `PORT` environment variable when the host sets one |
+| Health check | `GET /actuator/health` (public, says only `UP` or `DOWN`; nothing else under `/actuator` is exposed) |
+
+**Production profile.** When deployed, set `SPRING_PROFILES_ACTIVE=prod`. [`application-prod.properties`](backend/src/main/resources/application-prod.properties) turns SQL logging off, uses a small database pool, trusts the host's proxy headers and keeps the sample data off (the app refuses to start if it's switched on). Every secret comes from environment variables; the file lists them.
 
 ### 4. Start the backend
 
@@ -1074,6 +1077,7 @@ To run only the tests that don't need a database:
 | `npm run build` | Type-check and build for production |
 | `npm run lint` | Run ESLint |
 | `npm run preview` | Preview the production build |
+| `npm test` | Run the frontend tests once (Vitest); `npm run test:watch` re-runs them as you edit |
 
 ### Backend (`backend/`)
 
@@ -1128,12 +1132,12 @@ The workflow in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on e
 | Job | Steps |
 |---|---|
 | **Backend (build + test)** | Starts a temporary PostgreSQL 18 database (`redLink_test`), sets up Java 25, runs `./mvnw verify` (compile + tests) |
-| **Frontend (lint + build)** | Sets up Node.js 24, runs `npm ci`, `npm run lint` and `npm run build` |
+| **Frontend (lint + build)** | Sets up Node.js 24, runs `npm ci`, `npm run lint`, `npm test` and `npm run build` |
 
 Run the same checks locally before pushing:
 
 ```bash
-cd frontend && npm run lint && npm run build
+cd frontend && npm run lint && npm test && npm run build
 cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 ```
 
@@ -1162,7 +1166,7 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Notifications: posted, accepted, withdrawn, fulfilled, cancelled and hospital decisions, with a bell and a notifications page
 - [x] Requests expire automatically after their needed-by time (background job)
 - [x] Hospital dashboard and requests table; admin view of every request (read-only)
-- [ ] Frontend component tests (Vitest + Testing Library)
+- [x] Frontend tests (Vitest + Testing Library): helpers, route guards, sign-in, screen states; run in CI
 - [x] GitHub Actions CI (backend tests + frontend lint/build on every pull request)
 - [x] Branch protection on `main` (pull request + passing CI required)
 - [ ] Dockerize the backend

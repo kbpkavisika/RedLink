@@ -299,20 +299,20 @@ function AcceptedBanner({ request, me }: { request: IncomingRequest; me: DonorPr
             Tell the hospital you can't come?
             <button
               type="button"
-              className="font-semibold underline disabled:opacity-60"
+              className="hit-target relative font-semibold underline disabled:opacity-60"
               disabled={withdraw.isPending}
               onClick={cantMakeIt}
             >
               {withdraw.isPending ? 'Sending…' : "Yes, I can't make it"}
             </button>
-            <button type="button" className="text-on-success-muted underline" onClick={() => setConfirmWithdraw(false)}>
+            <button type="button" className="hit-target relative text-on-success-muted underline" onClick={() => setConfirmWithdraw(false)}>
               Keep my place
             </button>
           </span>
         ) : (
           <button
             type="button"
-            className="ml-auto text-label font-semibold text-white underline underline-offset-2"
+            className="hit-target relative ml-auto text-label font-semibold text-white underline underline-offset-2"
             onClick={() => setConfirmWithdraw(true)}
           >
             I can't make it anymore

@@ -76,7 +76,7 @@ export function LoginPage() {
           {...register('password')}
         />
 
-        <label className="flex cursor-pointer items-center gap-2.5 text-body text-ink">
+        <label className="flex min-h-9 cursor-pointer items-center gap-2.5 self-start text-body text-ink">
           <input type="checkbox" className="size-4 accent-primary" {...register('remember')} />
           Keep me signed in on this device
         </label>

@@ -62,7 +62,7 @@ export function SearchInput({ value, onChange, label, placeholder = 'Search…',
           type="button"
           aria-label="Clear search"
           onClick={clear}
-          className="absolute top-1/2 right-1.5 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-text-subtle hover:bg-bg hover:text-ink focus-visible:shadow-focus focus-visible:outline-none"
+          className="hit-target absolute top-1/2 right-1.5 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-text-subtle hover:bg-bg hover:text-ink focus-visible:shadow-focus focus-visible:outline-none"
         >
           <X size={14} aria-hidden="true" />
         </button>
