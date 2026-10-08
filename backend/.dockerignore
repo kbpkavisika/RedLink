@@ -1,0 +1,14 @@
+# Keep the build context small, and never copy local secrets into an image
+target/
+HELP.md
+package-lock.json
+scripts/
+src/main/resources/application-local.properties
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/

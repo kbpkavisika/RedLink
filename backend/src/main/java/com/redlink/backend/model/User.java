@@ -35,6 +35,9 @@ public class User {
     private boolean enabled = true;
     private boolean mustChangePassword = false;
 
+    // Tokens issued before this are refused (CurrentUser); null = never changed
+    private Instant passwordChangedAt;
+
     @CreationTimestamp
     @Column(updatable = false)
     private Instant createdAt;

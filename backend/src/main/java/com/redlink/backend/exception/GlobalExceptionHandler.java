@@ -37,6 +37,15 @@ public class GlobalExceptionHandler {
         return build(ex.getStatus(), ex.getMessage(), ex.getFieldErrors(), request);
     }
 
+    // Tried too often (AuthRateLimiter): Retry-After says how many seconds to wait
+    @ExceptionHandler(TooManyRequestsException.class)
+    ResponseEntity<ApiError> handleTooManyRequests(TooManyRequestsException ex, HttpServletRequest request) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.RETRY_AFTER, String.valueOf(TooManyRequestsException.seconds(ex.getRetryAfter())));
+        log.info("Rate limit hit path={}: {}", request.getRequestURI(), ex.getMessage());
+        return build(ex.getStatus(), ex.getMessage(), List.of(), request, headers);
+    }
+
     // @Valid on a request body failed
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiError> handleInvalidBody(MethodArgumentNotValidException ex, HttpServletRequest request) {

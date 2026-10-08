@@ -9,6 +9,7 @@ import { useAuth } from '../auth/useAuth';
 import { Button, FormAlert, LinkButton, Panel, PasswordInput } from '../components/ui';
 import { applyFieldErrors } from '../lib/formErrors';
 import { homePathFor } from '../lib/roles';
+import { tokenStore } from '../lib/tokenStore';
 import type { ApiError } from '../types';
 
 // Same limits as the backend (ChangePasswordRequest): 8–72 characters, different from the current one
@@ -37,7 +38,7 @@ type ChangePasswordForm = z.infer<typeof schema>;
  * gave a new staff member, or the first-admin seeder's) are sent here by RequireAuth and can't leave until they choose a new one.
  */
 export function ChangePasswordPage() {
-  const { user, refreshUser, logout } = useAuth();
+  const { user, startSession, logout } = useAuth();
   const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -59,8 +60,10 @@ export function ChangePasswordPage() {
   const onSubmit = handleSubmit(async ({ currentPassword, newPassword }) => {
     setFormError(null);
     try {
-      await authApi.changePassword({ currentPassword, newPassword });
-      await refreshUser(); // mustChangePassword is now false, so RequireAuth lets them through
+      const response = await authApi.changePassword({ currentPassword, newPassword });
+      // The old token no longer works; the new one is saved where it was. mustChangePassword is now false,
+      // so RequireAuth lets them through.
+      startSession(response, tokenStore.isRemembered());
       toast.success('Your password has been changed.');
       navigate(home, { replace: true });
     } catch (error) {
@@ -80,7 +83,7 @@ export function ChangePasswordPage() {
             <p className="text-body text-text-muted">
               {mustChange
                 ? 'You signed in with a temporary password. Choose your own to continue.'
-                : 'You stay signed in on this device after changing it.'}
+                : 'You stay signed in on this device; other devices are signed out.'}
             </p>
           </div>
 

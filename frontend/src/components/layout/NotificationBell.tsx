@@ -17,7 +17,7 @@ const PREVIEW = 8;
 export function NotificationBell() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { data } = useNotifications();
+  const { data } = useNotifications(!user?.mustChangePassword);
   const markRead = useMarkRead();
   const markAllRead = useMarkAllRead();
   const [open, setOpen] = useState(false);

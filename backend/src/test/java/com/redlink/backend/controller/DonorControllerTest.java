@@ -2,9 +2,12 @@ package com.redlink.backend.controller;
 
 import com.redlink.backend.dto.DonorSummary;
 import com.redlink.backend.exception.NotFoundException;
+import com.redlink.backend.model.User;
 import com.redlink.backend.model.enums.BloodGroup;
+import com.redlink.backend.security.CurrentUser;
 import com.redlink.backend.security.SecurityConfig;
 import com.redlink.backend.service.DonorService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -36,6 +39,15 @@ class DonorControllerTest {
 
     @MockitoBean
     private DonorService donorService;
+
+    // AccountStatusInterceptor loads the signed-in user; here it's always an active account
+    @MockitoBean
+    private CurrentUser currentUser;
+
+    @BeforeEach
+    void activeAccount() {
+        given(currentUser.require()).willReturn(new User());
+    }
 
     private final DonorSummary kamal = new DonorSummary(
             1L, "Kamal Perera", BloodGroup.O_POS, "0771234567", "Colombo", true, LocalDate.of(2026, 5, 1));

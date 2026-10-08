@@ -294,7 +294,8 @@ class AuthFlowIntegrationTest {
         mvc.perform(patch("/api/auth/me/password").header("Authorization", "Bearer " + token)
                         .contentType("application/json").content(change.formatted(PASSWORD, "Brand-New-Pass2")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mustChangePassword").value(false));
+                .andExpect(jsonPath("$.token").isNotEmpty())
+                .andExpect(jsonPath("$.user.mustChangePassword").value(false));
 
         postJson("/api/auth/login", """
                 {"email":"%s","password":"%s"}""".formatted(email("admin"), PASSWORD))

@@ -16,6 +16,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.util.Optional;
 
 @Service
@@ -30,16 +31,18 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final CurrentUser currentUser;
+    private final Clock clock;
 
     // Checked when the email doesn't exist, so that answer takes as long as a wrong password
     private final String dummyHash;
 
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                       JwtService jwtService, CurrentUser currentUser) {
+                       JwtService jwtService, CurrentUser currentUser, Clock clock) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.currentUser = currentUser;
+        this.clock = clock;
         this.dummyHash = passwordEncoder.encode("redlink-timing-equalizer");
     }
 
@@ -74,11 +77,13 @@ public class AuthService {
     }
 
     /**
-     * Replaces the signed-in user's password and clears mustChangePassword.
+     * Replaces the signed-in user's password and clears mustChangePassword. Every token issued before now
+     * stops working (CurrentUser), so other devices are signed out; this device gets a new token, lasting
+     * as long as its old one did (normal or "Keep me signed in").
      * A wrong current password is a 400 on the field, not a 401: a 401 would make the frontend sign the user out.
      */
     @Transactional
-    public CurrentUserResponse changePassword(ChangePasswordRequest request) {
+    public LoginResponse changePassword(ChangePasswordRequest request) {
         User user = currentUser.require();
 
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
@@ -92,6 +97,9 @@ public class AuthService {
 
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         user.setMustChangePassword(false);
-        return CurrentUserResponse.from(user); // saved when the transaction commits
+        user.setPasswordChangedAt(clock.instant()); // saved when the transaction commits
+
+        JwtService.IssuedToken token = jwtService.issue(user, jwtService.isRememberMe(currentUser.token()));
+        return new LoginResponse(token.token(), token.expiresAt(), CurrentUserResponse.from(user));
     }
 }

@@ -7,12 +7,14 @@ import {
 } from '../api/notifications';
 import type { ApiError, NotificationFeed, NotificationItem } from '../types';
 
-// Checks for new notifications every 30 seconds while the app is open (in-app only, no push)
-export function useNotifications() {
+// Checks for new notifications every 30 seconds while the app is open (in-app only, no push).
+// Paused until a temporary password is changed: the API refuses everything else until then.
+export function useNotifications(enabled = true) {
   return useQuery<NotificationFeed, ApiError>({
     queryKey: notificationKeys.all,
     queryFn: getNotifications,
     refetchInterval: 30_000,
+    enabled,
   });
 }
 

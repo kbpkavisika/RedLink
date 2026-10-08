@@ -1,7 +1,9 @@
 package com.redlink.backend.security;
 
 import com.redlink.backend.controller.DonorController;
+import com.redlink.backend.model.User;
 import com.redlink.backend.service.DonorService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -12,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static com.redlink.backend.support.TestAuth.ADMIN;
 import static com.redlink.backend.support.TestAuth.DONOR;
 import static com.redlink.backend.support.TestAuth.HOSPITAL_STAFF;
+import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -30,6 +33,15 @@ class SecurityRulesTest {
 
     @MockitoBean
     private DonorService donorService;
+
+    // AccountStatusInterceptor loads the signed-in user; here it's always an active account
+    @MockitoBean
+    private CurrentUser currentUser;
+
+    @BeforeEach
+    void activeAccount() {
+        given(currentUser.require()).willReturn(new User());
+    }
 
     @Test
     void hospitalStaffManageRequests() throws Exception {
