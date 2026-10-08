@@ -49,9 +49,9 @@ public class AuthController {
         return authService.me();
     }
 
-    // Returns the updated user (mustChangePassword is now false)
+    // Returns a new token and the updated user (mustChangePassword is now false); older tokens stop working
     @PatchMapping("/me/password")
-    public CurrentUserResponse changePassword(@Valid @RequestBody ChangePasswordRequest body) {
+    public LoginResponse changePassword(@Valid @RequestBody ChangePasswordRequest body) {
         return authService.changePassword(body);
     }
 }

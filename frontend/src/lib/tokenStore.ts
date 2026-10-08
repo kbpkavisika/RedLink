@@ -16,6 +16,11 @@ export const tokenStore = {
     return safely(() => sessionStorage.getItem(KEY) ?? localStorage.getItem(KEY), null);
   },
 
+  // Was the current token saved with "Keep me signed in"?
+  isRemembered(): boolean {
+    return safely(() => localStorage.getItem(KEY) !== null, false);
+  },
+
   set(token: string, remember: boolean) {
     this.clear();
     safely(() => (remember ? localStorage : sessionStorage).setItem(KEY, token), undefined);

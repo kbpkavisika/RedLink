@@ -1,5 +1,6 @@
 package com.redlink.backend.auth;
 
+import com.jayway.jsonpath.JsonPath;
 import com.redlink.backend.model.User;
 import com.redlink.backend.model.enums.Role;
 import com.redlink.backend.repository.UserRepository;
@@ -68,14 +69,15 @@ class MustChangePasswordIntegrationTest {
     @Test
     void changingThePasswordUnlocksTheApi() throws Exception {
         User admin = mustChange(Role.ADMIN);
-        String bearer = testData.bearer(admin);
 
-        mvc.perform(patch("/api/auth/me/password").header("Authorization", bearer)
+        String body = mvc.perform(patch("/api/auth/me/password").header("Authorization", testData.bearer(admin))
                         .contentType("application/json").content(changePasswordJson()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mustChangePassword").value(false));
+                .andExpect(jsonPath("$.user.mustChangePassword").value(false))
+                .andReturn().getResponse().getContentAsString();
 
-        mvc.perform(get("/api/admin/users").header("Authorization", bearer))
+        // The token the change returned, since older ones stop working
+        mvc.perform(get("/api/admin/users").header("Authorization", "Bearer " + JsonPath.read(body, "$.token")))
                 .andExpect(status().isOk());
     }
 

@@ -137,7 +137,7 @@
         {
           "name": "Change own password",
           "request": {
-            "description": "Changes the password of whoever is signed in. For a sample account, this replaces redlink.seed.password for that user only.",
+            "description": "Changes the password of whoever is signed in. For a sample account, this replaces redlink.seed.password for that user only. Every older token stops working; the new one in the response is saved for the next requests.",
             "method": "PATCH",
             "header": [],
             "body": {
@@ -146,7 +146,15 @@
               "options": { "raw": { "language": "json" } }
             },
             "url": { "raw": "{{baseUrl}}/auth/me/password", "host": ["{{baseUrl}}"], "path": ["auth", "me", "password"] }
-          }
+          },
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "if (pm.response.code === 200) {",
+              "  pm.collectionVariables.set(\"token\", pm.response.json().token);",
+              "  console.log('Password changed. Older tokens no longer work; the new token is saved.');",
+              "}"
+            ] } }
+          ]
         },
         {
           "name": "Register donor",

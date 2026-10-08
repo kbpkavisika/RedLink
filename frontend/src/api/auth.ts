@@ -25,9 +25,10 @@ export async function registerHospital(body: RegisterHospitalRequest): Promise<L
   return data;
 }
 
-// Returns the updated user (mustChangePassword is now false). The current token stays valid.
-export async function changePassword(body: ChangePasswordRequest): Promise<CurrentUser> {
-  const { data } = await api.patch<CurrentUser>('/auth/me/password', body);
+// Returns a new token and the updated user (mustChangePassword is now false).
+// Every older token stops working, so other devices are signed out; save this one.
+export async function changePassword(body: ChangePasswordRequest): Promise<LoginResponse> {
+  const { data } = await api.patch<LoginResponse>('/auth/me/password', body);
   return data;
 }
 

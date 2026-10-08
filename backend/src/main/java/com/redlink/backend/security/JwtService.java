@@ -4,12 +4,14 @@ import com.redlink.backend.config.JwtProperties;
 import com.redlink.backend.model.User;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 
 /**
@@ -47,6 +49,14 @@ public class JwtService {
 
         String token = encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
         return new IssuedToken(token, expiresAt);
+    }
+
+    // Was this token issued by a "Keep me signed in" sign-in? Its lifetime is longer than a normal one's.
+    public boolean isRememberMe(Jwt token) {
+        if (token.getIssuedAt() == null || token.getExpiresAt() == null) {
+            return false;
+        }
+        return Duration.between(token.getIssuedAt(), token.getExpiresAt()).compareTo(properties.expiry()) > 0;
     }
 
     public record IssuedToken(String token, Instant expiresAt) {

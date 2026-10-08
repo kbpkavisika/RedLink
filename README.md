@@ -344,6 +344,7 @@ Authorization: Bearer <token>
 - Passwords are hashed with **BCrypt** (stored as `{bcrypt}$2a$10$…`), never stored as text.
 - Wrong password and unknown email get the **same** 401 message and take about the same time, so nobody can find out which emails are registered. A disabled account is only revealed after the right password.
 - Each request loads the user from the database, so **disabling an account stops its token** on the next request.
+- **Changing your password signs out every other device:** tokens issued before the change are refused with 401. `PATCH /api/auth/me/password` returns a new token (same lifetime as the old one) so the device that made the change stays signed in.
 - 401 and 403 use the same [error format](#error-format) as every other error. A 401 makes the frontend sign the user out; a 403 doesn't.
 - CSRF protection is off because the token travels in a header, not a cookie. CORS only allows origins listed in `redlink.cors.allowed-origins` (empty in development, where the Vite proxy is used).
 
@@ -542,6 +543,7 @@ erDiagram
 | `hospital_id` | bigint | 🔗 hospitals | Only set for hospital staff |
 | `enabled` | boolean | | `false` blocks login |
 | `must_change_password` | boolean | | `true` for a first password someone else chose (new staff, the startup admin); the user must choose their own at next login |
+| `password_changed_at` | timestamp | | When the user last changed their password; tokens issued before it are refused. Empty if never changed |
 | `created_at` | timestamp | | When the account was created |
 
 #### 🏥 hospitals
@@ -866,7 +868,7 @@ Start the backend first (step 4). All endpoints are under `http://localhost:8080
 | `POST` | `/api/auth/register/hospital` | Anyone | Register a hospital (`PENDING`) and its first staff user; returns `201` with a token |
 | `POST` | `/api/auth/login` | Anyone | Email + password (+ optional `rememberMe`) → token |
 | `GET` | `/api/auth/me` | Signed in | The current user. For staff, also `hospitalName`, `hospitalStatus` and, if rejected, `hospitalRejectionReason` |
-| `PATCH` | `/api/auth/me/password` | Signed in | Change own password (`currentPassword`, `newPassword`) |
+| `PATCH` | `/api/auth/me/password` | Signed in | Change own password (`currentPassword`, `newPassword`); returns a new token, older ones stop working |
 | `GET` | `/api/donors` | Admin | List all donors |
 | `GET` | `/api/donors/{id}` | Admin | One donor; `404` in the [error format](#error-format) if the ID doesn't exist |
 | `GET` | `/api/admin/hospitals?status=` | Admin | All hospitals, newest first; with `status` (`PENDING`, `APPROVED`, `REJECTED`) only that queue, oldest first |
