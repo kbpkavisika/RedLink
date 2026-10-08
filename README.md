@@ -115,7 +115,7 @@ Further staff accounts are created by the admin in **Users → Add staff user** 
 - **Registration** only creates `DONOR` or `HOSPITAL_STAFF` users. Any `role` sent in the request body is ignored. New users are signed in straight away.
 - **Donors** must be 18 to 60 years old when they register.
 - **Emails** are trimmed and lowercased everywhere, so `Kamal@Mail.lk` and `kamal@mail.lk` are the same account.
-- **Forgotten password (v1):** the "Forgot password?" page explains that reset by email isn't available yet and that nobody, including admins, can see or change a password. The only temporary passwords are the first ones: the startup admin's, and the one an admin gives a new staff member; must_change_password makes them choose their own at first sign-in.
+- **Forgotten password (v1):** the "Forgot password?" page explains that reset by email isn't available yet and that nobody, including admins, can see or change a password. The only temporary passwords are the first ones: the startup admin's, and the one an admin gives a new staff member; must_change_password makes them choose their own at first sign-in. The API enforces it too: until the password is changed, every call except `GET /api/auth/me` and `PATCH /api/auth/me/password` is refused with 403.
 
 See [Authentication](#authentication) for how tokens and roles work.
 

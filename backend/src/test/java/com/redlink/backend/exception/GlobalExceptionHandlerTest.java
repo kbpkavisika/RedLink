@@ -1,16 +1,20 @@
 package com.redlink.backend.exception;
 
+import com.redlink.backend.model.User;
 import com.redlink.backend.model.enums.BloodGroup;
+import com.redlink.backend.security.CurrentUser;
 import com.redlink.backend.security.SecurityConfig;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
@@ -19,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -34,6 +39,15 @@ class GlobalExceptionHandlerTest {
 
     @Autowired
     private MockMvc mvc;
+
+    // AccountStatusInterceptor loads the signed-in user; here it's always an active account
+    @MockitoBean
+    private CurrentUser currentUser;
+
+    @BeforeEach
+    void activeAccount() {
+        given(currentUser.require()).willReturn(new User());
+    }
 
     // Every request in this class comes from a signed-in user, so the security rules let it through
     private static MockHttpServletRequestBuilder get(String url) {
