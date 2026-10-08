@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://redlink-backend.onrender.com/api/:path*"
+      "destination": "https://redlink-backend-v6ag.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
