@@ -1,4 +1,4 @@
-name: redLink CI
+name: redLink CI/CD
 
 on:
   push:
@@ -79,3 +79,50 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  deploy:
+    name: Deploy (Render + Vercel)
+    # Only after both test jobs pass, and only for code that reached main (never for a PR)
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    # Shows each deploy under "Deployments" on the repo page
+    environment: production
+
+    # One deploy at a time; a newer push waits instead of cancelling a deploy halfway
+    concurrency:
+      group: production
+      cancel-in-progress: false
+
+    env:
+      BACKEND_URL: https://redlink-backend-v6ag.onrender.com
+
+    steps:
+      # The hook URLs are secrets: anyone who has one can start a deploy
+      - name: Deploy backend to Render
+        env:
+          HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: curl --fail-with-body -sS -X POST "$HOOK_URL"
+
+      - name: Deploy frontend to Vercel
+        env:
+          HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: curl --fail-with-body -sS -X POST "$HOOK_URL"
+
+      # Smoke test: the backend must answer its health check within 10 minutes. Render's free tier
+      # can take a minute or more to wake up, hence the retries. Render keeps the old version serving
+      # until the new one is healthy, so this proves the backend is up, not which version answered.
+      - name: Check backend health
+        run: |
+          for attempt in $(seq 1 20); do
+            if curl -fsS -m 30 "$BACKEND_URL/actuator/health"; then
+              echo
+              echo "Backend is healthy"
+              exit 0
+            fi
+            echo "Attempt $attempt: not ready yet, retrying in 30s"
+            sleep 30
+          done
+          echo "Backend did not become healthy in time"
+          exit 1
