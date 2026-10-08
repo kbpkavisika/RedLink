@@ -345,6 +345,7 @@ Authorization: Bearer <token>
 - Wrong password and unknown email get the **same** 401 message and take about the same time, so nobody can find out which emails are registered. A disabled account is only revealed after the right password.
 - Each request loads the user from the database, so **disabling an account stops its token** on the next request.
 - **Changing your password signs out every other device:** tokens issued before the change are refused with 401. `PATCH /api/auth/me/password` returns a new token (same lifetime as the old one) so the device that made the change stays signed in.
+- **Rate limits:** sign-in is limited to 10 attempts a minute per address and 10 every 15 minutes per account (from any address); registration to 5 an hour per address. Over a limit, the API answers **429** with a `Retry-After` header, before any password is checked. Counts are kept in memory (one backend instance), so a restart resets them.
 - 401 and 403 use the same [error format](#error-format) as every other error. A 401 makes the frontend sign the user out; a 403 doesn't.
 - CSRF protection is off because the token travels in a header, not a cookie. CORS only allows origins listed in `redlink.cors.allowed-origins` (empty in development, where the Vite proxy is used).
 
@@ -356,6 +357,8 @@ Authorization: Bearer <token>
 | `redlink.jwt.expiry`, `redlink.jwt.remember-me-expiry` | `application.properties` | `12h`, `7d` |
 | `redlink.admin.email`, `redlink.admin.password` | `application-local.properties` / `REDLINK_ADMIN_EMAIL`, `REDLINK_ADMIN_PASSWORD` | Optional; creates the first admin once |
 | `redlink.cors.allowed-origins` | `REDLINK_CORS_ALLOWED_ORIGINS` when deployed | e.g. the Vercel URL |
+| `redlink.rate-limit.*` | `application.properties` | Sign-in and registration limits; `enabled=false` switches them off |
+| `redlink.rate-limit.client-ip-header` | `REDLINK_RATE_LIMIT_CLIENT_IP_HEADER` when deployed | The header the host puts the visitor's address in. Empty = the connecting address |
 
 During development, Vite proxies every `/api/*` request from port 5173 to the backend on port 8080, so no CORS configuration is needed.
 
