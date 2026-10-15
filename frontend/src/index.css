@@ -55,9 +55,10 @@
   --color-info: #1F5FAD;
   --color-info-soft: #E8F0FB;
 
-  /* Fonts → font-display, font-sans, font-mono */
-  --font-display: 'Bricolage Grotesque', sans-serif;
-  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  /* Fonts → font-display, font-sans, font-mono
+     The brand fonts have no Sinhala or Tamil letters, so the browser takes those from the Noto fonts after them */
+  --font-display: 'Bricolage Grotesque', 'Noto Sans Sinhala', 'Noto Sans Tamil', sans-serif;
+  --font-sans: 'IBM Plex Sans', 'Noto Sans Sinhala', 'Noto Sans Tamil', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
   /* Type scale → text-display-xl, text-title-md, text-caption …
