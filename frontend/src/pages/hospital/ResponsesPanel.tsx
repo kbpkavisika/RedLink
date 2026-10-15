@@ -1,4 +1,5 @@
 import { MessageSquare, Phone } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   Badge,
   BloodGroupBadge,
@@ -20,68 +21,19 @@ import type { BloodRequestDetail, RequestResponse, ResponseStatus } from '../../
 
 const REPLY_FILTERS = ['rq', 'reply'] as const;
 
-const STATUS: Record<ResponseStatus, { label: string; tone: BadgeTone }> = {
-  ACCEPTED: { label: 'Coming', tone: 'success' },
-  WITHDRAWN: { label: "Can't make it", tone: 'warning' },
-  DECLINED: { label: 'Declined', tone: 'neutral' },
+// How each reply looks; after the request is fulfilled, "Coming" becomes what actually happened.
+// The words are translated: t(`status.reply.${badge}`)
+type ReplyBadge = ResponseStatus | 'DONATED' | 'DIDNT_DONATE';
+const TONES: Record<ReplyBadge, BadgeTone> = {
+  ACCEPTED: 'success',
+  WITHDRAWN: 'warning',
+  DECLINED: 'neutral',
+  DONATED: 'success',
+  DIDNT_DONATE: 'neutral',
 };
+const STATUSES: ResponseStatus[] = ['ACCEPTED', 'WITHDRAWN', 'DECLINED'];
 
-// After the request is fulfilled, "Coming" becomes what actually happened
-const OUTCOME = {
-  DONATED: { label: 'Donated', tone: 'success' },
-  DIDNT_DONATE: { label: "Didn't donate", tone: 'neutral' },
-} satisfies Record<string, { label: string; tone: BadgeTone }>;
-
-type Row = RequestResponse & { badge: { label: string; tone: BadgeTone } };
-
-const columns: Column<Row>[] = [
-  {
-    key: 'donor',
-    header: 'Donor',
-    cell: (response) => (
-      <div className="flex items-center gap-3">
-        <BloodGroupBadge group={response.bloodGroup} />
-        <div className="min-w-0">
-          <p className="truncate font-medium">{response.name}</p>
-          <p className="text-caption text-text-subtle">{response.city}</p>
-        </div>
-      </div>
-    ),
-  },
-  {
-    key: 'status',
-    header: 'Reply',
-    cell: (response) => <Badge tone={response.badge.tone}>{response.badge.label}</Badge>,
-  },
-  {
-    key: 'when',
-    header: 'When',
-    cell: (response) => (
-      <span className="whitespace-nowrap text-text-muted">
-        {formatInstant(response.status === 'WITHDRAWN' ? response.updatedAt : response.respondedAt, true)}
-      </span>
-    ),
-  },
-  {
-    key: 'phone',
-    header: 'Phone',
-    align: 'right',
-    // Only donors who are coming need a call; the others have said no
-    cell: (response) =>
-      response.status === 'ACCEPTED' && response.phone ? (
-        <a
-          href={`tel:${response.phone}`}
-          className="inline-flex items-center gap-1.5 whitespace-nowrap no-underline"
-          aria-label={`Call ${response.name}, ${response.phone}`}
-        >
-          <Phone size={14} aria-hidden="true" />
-          {response.phone}
-        </a>
-      ) : (
-        <span className="text-text-subtle">—</span>
-      ),
-  },
-];
+type Row = RequestResponse & { badge: ReplyBadge };
 
 /**
  * H7 on the request page: who is coming, who can't make it after all, and who declined.
@@ -95,6 +47,7 @@ interface ResponsesPanelProps {
 }
 
 export function ResponsesPanel({ request, notifiedCount, donatedDonorIds }: ResponsesPanelProps) {
+  const { t } = useTranslation();
   const { data: responses, isPending, isError, error, refetch } = useResponses(request.id);
   // Own URL keys, so they don't clash with the match list's search on the same page
   const filters = useUrlFilters(REPLY_FILTERS);
@@ -112,23 +65,77 @@ export function ResponsesPanel({ request, notifiedCount, donatedDonorIds }: Resp
       badge:
         fulfilled && response.status === 'ACCEPTED'
           ? donatedDonorIds.includes(response.donorId)
-            ? OUTCOME.DONATED
-            : OUTCOME.DIDNT_DONATE
-          : STATUS[response.status],
+            ? 'DONATED'
+            : 'DIDNT_DONATE'
+          : response.status,
     }));
+
+  const columns: Column<Row>[] = [
+    {
+      key: 'donor',
+      header: t('common.donor'),
+      cell: (response) => (
+        <div className="flex items-center gap-3">
+          <BloodGroupBadge group={response.bloodGroup} />
+          <div className="min-w-0">
+            <p className="truncate font-medium">{response.name}</p>
+            <p className="text-caption text-text-subtle">{response.city}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: t('hospital.responses.reply'),
+      cell: (response) => <Badge tone={TONES[response.badge]}>{t(`status.reply.${response.badge}`)}</Badge>,
+    },
+    {
+      key: 'when',
+      header: t('hospital.responses.when'),
+      cell: (response) => (
+        <span className="whitespace-nowrap text-text-muted">
+          {formatInstant(response.status === 'WITHDRAWN' ? response.updatedAt : response.respondedAt, true)}
+        </span>
+      ),
+    },
+    {
+      key: 'phone',
+      header: t('common.phone'),
+      align: 'right',
+      // Only donors who are coming need a call; the others have said no
+      cell: (response) =>
+        response.status === 'ACCEPTED' && response.phone ? (
+          <a
+            href={`tel:${response.phone}`}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap no-underline"
+            aria-label={t('common.callLabel', { name: response.name, phone: response.phone })}
+          >
+            <Phone size={14} aria-hidden="true" />
+            {response.phone}
+          </a>
+        ) : (
+          <span className="text-text-subtle">—</span>
+        ),
+    },
+  ];
 
   return (
     <Panel
-      title="Donor replies"
+      title={t('hospital.responses.title')}
       actions={
         responses &&
         responses.length > 0 && (
           <span className="text-label text-text-subtle">
-            <strong className="text-ink">
-              {fulfilled ? `${donatedDonorIds.length} donated` : `${coming} coming`}
-            </strong>{' '}
-            for {request.unitsNeeded} {request.unitsNeeded === 1 ? 'unit' : 'units'} · {count('WITHDRAWN')} withdrew ·{' '}
-            {count('DECLINED')} declined
+            <Trans
+              i18nKey={fulfilled ? 'hospital.responses.summaryDonated' : 'hospital.responses.summaryComing'}
+              values={{
+                count: fulfilled ? donatedDonorIds.length : coming,
+                units: t('common.unit', { count: request.unitsNeeded }),
+                withdrew: count('WITHDRAWN'),
+                declined: count('DECLINED'),
+              }}
+              components={{ b: <strong className="text-ink" /> }}
+            />
           </span>
         )
       }
@@ -136,35 +143,36 @@ export function ResponsesPanel({ request, notifiedCount, donatedDonorIds }: Resp
       {responses && responses.length > 0 && (
         <FilterBar shown={rows.length} total={responses.length} active={filters.active} onClear={filters.clear}>
           <SearchInput
-            label="Search donor replies"
-            placeholder="Donor name or phone"
+            label={t('hospital.responses.search')}
+            placeholder={t('common.namePhonePlaceholder')}
             value={rq}
             onChange={(value) => filters.set('rq', value)}
           />
           <FilterSelect
-            label="Reply"
-            allLabel="All replies"
+            label={t('hospital.responses.reply')}
+            allLabel={t('hospital.responses.allReplies')}
             value={reply}
             onChange={(value) => filters.set('reply', value)}
-            options={(Object.keys(STATUS) as ResponseStatus[]).map((status) => ({
-              value: status,
-              label: STATUS[status].label,
-            }))}
+            options={STATUSES.map((status) => ({ value: status, label: t(`status.reply.${status}`) }))}
           />
         </FilterBar>
       )}
       {isPending ? (
         <StateView state="loading" rows={2} />
       ) : isError ? (
-        <StateView state="error" title="We couldn't load replies" error={error} onRetry={() => void refetch()} />
+        <StateView state="error" title={t('hospital.responses.loadError')} error={error} onRetry={() => void refetch()} />
       ) : responses.length > 0 && rows.length === 0 ? (
         <StateView
           state="no-results"
-          title={reply ? `No "${STATUS[reply as ResponseStatus].label}" replies match` : 'No replies match'}
-          description="Try another name, or clear the filters to see every reply."
+          title={
+            reply
+              ? t('hospital.responses.noStatusMatch', { status: t(`status.reply.${reply as ResponseStatus}`) })
+              : t('hospital.responses.noMatch')
+          }
+          description={t('hospital.responses.noMatchBody')}
           action={
             <Button variant="outline" onClick={filters.clear}>
-              Clear filters
+              {t('common.clearFilters')}
             </Button>
           }
         />
@@ -172,16 +180,16 @@ export function ResponsesPanel({ request, notifiedCount, donatedDonorIds }: Resp
         <StateView
           state="empty"
           icon={MessageSquare}
-          title="No replies yet"
+          title={t('hospital.responses.emptyTitle')}
           description={
             notifiedCount > 0
-              ? `${notifiedCount} ${notifiedCount === 1 ? 'donor was' : 'donors were'} notified. Replies appear here as they come in; you can also call the matches below.`
-              : 'Replies appear here as donors answer. You can also call the matches below.'
+              ? t('hospital.responses.emptyNotified', { count: notifiedCount })
+              : t('hospital.responses.emptyBody')
           }
         />
       ) : (
         <Table
-          caption={`Donor replies to #${request.reference}`}
+          caption={t('hospital.responses.caption', { ref: request.reference })}
           rows={rows}
           rowKey={(response) => response.donorId}
           columns={columns}

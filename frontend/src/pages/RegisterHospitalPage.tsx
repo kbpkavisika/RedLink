@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
 import * as authApi from '../api/auth';
@@ -10,20 +11,21 @@ import { AuthLayout } from '../components/layout/AuthLayout';
 import { Button, FormAlert, Input, PasswordInput } from '../components/ui';
 import { CITIES } from '../lib/cities';
 import { applyFieldErrors } from '../lib/formErrors';
+import { msg } from '../lib/messages';
 import { emailField, fullNameField, newPasswordField, phoneField } from '../lib/validation';
 import type { ApiError } from '../types';
 
-function required(what: string, max: number) {
-  return z.string().trim().min(1, `Enter ${what}`).max(max, `Use at most ${max} characters`);
+function required(missing: Parameters<typeof msg>[0], max: number) {
+  return z.string().trim().min(1, msg(missing)).max(max, msg('tooLong', max));
 }
 
 // Same limits as the backend (RegisterHospitalRequest)
 const schema = z.object({
   hospital: z.object({
-    name: required("the hospital's name", 200),
-    registrationNo: required('the registration number', 100),
-    address: required("the hospital's address", 300),
-    city: required("the hospital's city", 100),
+    name: required('enterHospitalName', 200),
+    registrationNo: required('enterRegistrationNo', 100),
+    address: required('enterHospitalAddress', 300),
+    city: required('enterHospitalCity', 100),
     phone: phoneField,
   }),
   staff: z.object({
@@ -55,6 +57,7 @@ const FIELDS = [
  * then signs them in. Until an admin approves the hospital, they see the approval progress instead of posting.
  */
 export function RegisterHospitalPage() {
+  const { t } = useTranslation();
   const { startSession } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -75,7 +78,7 @@ export function RegisterHospitalPage() {
     setFormError(null);
     try {
       const response = await authApi.registerHospital(values);
-      toast.success("Registration received. We'll review it within 1–2 working days.");
+      toast.success(t('auth.registerHospital.received'));
       startSession(response, false);
     } catch (error) {
       const apiError = error as ApiError;
@@ -89,40 +92,41 @@ export function RegisterHospitalPage() {
   return (
     <AuthLayout>
       <div className="flex flex-col gap-2">
-        <h1 className="font-display text-display-md text-ink">Register a hospital</h1>
-        <p className="text-body text-text-muted">
-          An admin checks every hospital before it can post blood requests. This usually takes 1–2 working days.
-        </p>
+        <h1 className="font-display text-display-md text-ink">{t('auth.registerHospital.title')}</h1>
+        <p className="text-body text-text-muted">{t('auth.registerHospital.subtitle')}</p>
       </div>
 
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-8">
         <FormAlert>{formError}</FormAlert>
 
-        <FormSection title="Hospital" description="As it appears on your registration with the Ministry of Health.">
+        <FormSection
+          title={t('auth.registerHospital.hospitalSection')}
+          description={t('auth.registerHospital.hospitalSectionBody')}
+        >
           <Input
-            label="Hospital name"
+            label={t('auth.registerHospital.hospitalName')}
             autoComplete="organization"
             autoFocus
             error={errors.hospital?.name?.message}
             {...register('hospital.name')}
           />
           <Input
-            label="Registration number"
-            hint="Admins use it to confirm the hospital is real"
+            label={t('auth.registerHospital.registrationNo')}
+            hint={t('auth.registerHospital.registrationNoHint')}
             error={errors.hospital?.registrationNo?.message}
             {...register('hospital.registrationNo')}
           />
           <Input
-            label="Address"
+            label={t('auth.registerHospital.address')}
             autoComplete="street-address"
             error={errors.hospital?.address?.message}
             {...register('hospital.address')}
           />
           <Input
-            label="City"
+            label={t('common.city')}
             list="hospital-city-suggestions"
             autoComplete="address-level2"
-            hint="Donors in this city are matched first"
+            hint={t('auth.registerHospital.cityHint')}
             error={errors.hospital?.city?.message}
             {...register('hospital.city')}
           />
@@ -132,27 +136,35 @@ export function RegisterHospitalPage() {
             ))}
           </datalist>
           <Input
-            label="Hospital phone"
+            label={t('auth.registerHospital.hospitalPhone')}
             type="tel"
             inputMode="tel"
             placeholder="0112345678"
-            hint="The blood bank or main line donors can call"
+            hint={t('auth.registerHospital.hospitalPhoneHint')}
             error={errors.hospital?.phone?.message}
             {...register('hospital.phone')}
           />
         </FormSection>
 
-        <FormSection title="Your account" description="You'll be the hospital's first staff user. An admin can add your colleagues later.">
-          <Input label="Full name" autoComplete="name" error={errors.staff?.fullName?.message} {...register('staff.fullName')} />
+        <FormSection
+          title={t('auth.registerHospital.accountSection')}
+          description={t('auth.registerHospital.accountSectionBody')}
+        >
           <Input
-            label="Work email"
+            label={t('common.fullName')}
+            autoComplete="name"
+            error={errors.staff?.fullName?.message}
+            {...register('staff.fullName')}
+          />
+          <Input
+            label={t('auth.registerHospital.workEmail')}
             type="email"
             autoComplete="email"
             error={errors.staff?.email?.message}
             {...register('staff.email')}
           />
           <Input
-            label="Mobile number"
+            label={t('common.mobileNumber')}
             type="tel"
             inputMode="tel"
             autoComplete="tel"
@@ -161,21 +173,21 @@ export function RegisterHospitalPage() {
             {...register('staff.phone')}
           />
           <PasswordInput
-            label="Password"
+            label={t('common.password')}
             autoComplete="new-password"
-            hint="8 to 72 characters"
+            hint={t('common.passwordHint')}
             error={errors.staff?.password?.message}
             {...register('staff.password')}
           />
         </FormSection>
 
         <Button type="submit" size="lg" fullWidth loading={isSubmitting}>
-          Submit for approval
+          {t('auth.registerHospital.submit')}
         </Button>
       </form>
 
       <p className="text-center text-body text-text-muted">
-        Already registered? <Link to="/login">Sign in</Link>
+        <Trans i18nKey="auth.registerHospital.haveAccount" components={{ link: <Link to="/login" /> }} />
       </p>
     </AuthLayout>
   );

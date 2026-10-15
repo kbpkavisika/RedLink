@@ -1,4 +1,5 @@
 import { isAxiosError } from 'axios';
+import i18n from '../i18n';
 import type { ApiError } from '../types';
 
 // Checks the fields only ApiError has; an AxiosError also has a numeric status and a message
@@ -36,12 +37,12 @@ export function toApiError(error: unknown): ApiError {
     // An answer without our format, e.g. the dev proxy when the backend isn't running
     if (response) {
       return response.status >= 500
-        ? build(response.status, 'Server Error', "We can't reach the RedLink server right now. Please try again in a moment.", path)
-        : build(response.status, 'Request Failed', `The request failed with status ${response.status}.`, path);
+        ? build(response.status, 'Server Error', i18n.t('errors.serverDown'), path)
+        : build(response.status, 'Request Failed', i18n.t('errors.requestFailed', { status: response.status }), path);
     }
 
     // No answer at all
-    return build(0, 'Network Error', "Can't reach RedLink. Check your internet connection and try again.", path);
+    return build(0, 'Network Error', i18n.t('errors.network'), path);
   }
 
   // Already converted, e.g. by the API client's interceptor
@@ -49,5 +50,5 @@ export function toApiError(error: unknown): ApiError {
     return error;
   }
 
-  return build(0, 'Unexpected Error', 'Something unexpected happened in the app. Please reload the page.');
+  return build(0, 'Unexpected Error', i18n.t('errors.unexpected'));
 }

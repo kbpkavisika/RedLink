@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { MessageCircle, RotateCcw, Send, Sparkles, Trash2, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../auth/useAuth';
 import { useChat } from '../../hooks/useChat';
 import type { ChatMessage, Role } from '../../types';
@@ -12,11 +13,11 @@ const MAX_LENGTH = 1000;
 // Show the character count once a message gets this close to the limit
 const COUNT_FROM = 800;
 
-const SUGGESTIONS: Record<Role, string[]> = {
-  DONOR: ['Who can donate blood?', 'How long do I wait between donations?', 'How do I pause my availability?'],
-  HOSPITAL_STAFF: ['How do I post a blood request?', 'How are donors matched?', 'How do I mark a request fulfilled?'],
-  ADMIN: ['How do I approve a hospital?', 'How do I add staff to a hospital?', 'Can I reset a user’s password?'],
-};
+// Three starter questions per role, in the chosen language (chat.suggestions.<role>.s1…s3)
+const SUGGESTIONS = ['s1', 's2', 's3'] as const;
+function suggestionKey(role: Role, suggestion: (typeof SUGGESTIONS)[number]) {
+  return `chat.suggestions.${role}.${suggestion}` as const;
+}
 
 // The conversation survives moving between pages, and is gone when the tab closes
 function storageKey(userId: number) {
@@ -48,6 +49,7 @@ function saveConversation(userId: number, messages: ChatMessage[]) {
  * Hidden when signed out, and until a temporary password is changed, as the API refuses everything else until then.
  */
 export function ChatWidget() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const chat = useChat();
   const [open, setOpen] = useState(false);
@@ -130,7 +132,7 @@ export function ChatWidget() {
         <section
           id={panelId}
           role="dialog"
-          aria-label="RedLink assistant"
+          aria-label={t('chat.title')}
           onKeyDown={(event) => {
             if (event.key === 'Escape') close();
           }}
@@ -145,15 +147,15 @@ export function ChatWidget() {
               <Sparkles size={16} aria-hidden="true" />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 className="text-body-lg font-semibold text-ink">RedLink assistant</h2>
-              <p className="text-caption text-text-subtle">Blood donation and using RedLink</p>
+              <h2 className="text-body-lg font-semibold text-ink">{t('chat.title')}</h2>
+              <p className="text-caption text-text-subtle">{t('chat.subtitle')}</p>
             </div>
             {messages.length > 0 && (
-              <Button variant="icon" aria-label="Clear chat" onClick={clear}>
+              <Button variant="icon" aria-label={t('chat.clear')} onClick={clear}>
                 <Trash2 size={16} aria-hidden="true" />
               </Button>
             )}
-            <Button variant="icon" aria-label="Close assistant" onClick={close}>
+            <Button variant="icon" aria-label={t('chat.close')} onClick={close}>
               <X size={18} aria-hidden="true" />
             </Button>
           </header>
@@ -162,11 +164,10 @@ export function ChatWidget() {
             {messages.length === 0 && (
               <div className="flex flex-col gap-3">
                 <p className="rounded-xl bg-surface px-3.5 py-2.5 text-body text-ink-2 ring-1 ring-border">
-                  Hi {user.fullName.split(' ')[0]}! Ask me about donating blood or how to use RedLink. You can write in
-                  English, සිංහල or தமிழ்.
+                  {t('chat.greeting', { name: user.fullName.split(' ')[0] })}
                 </p>
-                <ul aria-label="Suggested questions" className="flex flex-col items-start gap-2">
-                  {SUGGESTIONS[user.role].map((suggestion) => (
+                <ul aria-label={t('chat.suggested')} className="flex flex-col items-start gap-2">
+                  {SUGGESTIONS.map((key) => t(suggestionKey(user.role, key))).map((suggestion) => (
                     <li key={suggestion}>
                       <button
                         type="button"
@@ -182,7 +183,7 @@ export function ChatWidget() {
             )}
 
             {/* New replies are read out by screen readers */}
-            <ol aria-live="polite" aria-label="Conversation" className="flex flex-col gap-3">
+            <ol aria-live="polite" aria-label={t('chat.conversation')} className="flex flex-col gap-3">
               {messages.map((message, index) => (
                 <li
                   key={index}
@@ -193,7 +194,7 @@ export function ChatWidget() {
                       : 'self-start bg-surface text-ink ring-1 ring-border',
                   )}
                 >
-                  <span className="sr-only">{message.role === 'user' ? 'You: ' : 'Assistant: '}</span>
+                  <span className="sr-only">{message.role === 'user' ? t('chat.you') : t('chat.assistant')}</span>
                   {message.content}
                 </li>
               ))}
@@ -206,7 +207,7 @@ export function ChatWidget() {
                   <span className="size-1.5 animate-pulse rounded-full bg-text-subtle [animation-delay:150ms]" />
                   <span className="size-1.5 animate-pulse rounded-full bg-text-subtle [animation-delay:300ms]" />
                 </span>
-                Assistant is typing…
+                {t('chat.typing')}
               </p>
             )}
 
@@ -220,7 +221,7 @@ export function ChatWidget() {
                     leftIcon={<RotateCcw size={14} aria-hidden="true" />}
                     onClick={() => ask(messages)}
                   >
-                    Try again
+                    {t('common.tryAgain')}
                   </Button>
                 )}
               </div>
@@ -230,7 +231,7 @@ export function ChatWidget() {
           <form onSubmit={onSubmit} className="flex flex-col gap-1.5 border-t border-border px-3 py-3">
             <div className="flex items-end gap-2">
               <label htmlFor={inputId} className="sr-only">
-                Your question
+                {t('chat.yourQuestion')}
               </label>
               <textarea
                 id={inputId}
@@ -239,7 +240,7 @@ export function ChatWidget() {
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="Ask a question…"
+                placeholder={t('chat.placeholder')}
                 aria-invalid={tooLong || undefined}
                 className={clsx(
                   'max-h-32 min-h-10 flex-1 resize-none rounded-lg border bg-surface px-3 py-2 text-body-input text-ink',
@@ -249,7 +250,7 @@ export function ChatWidget() {
               />
               <button
                 type="submit"
-                aria-label="Send"
+                aria-label={t('chat.send')}
                 disabled={!draft.trim() || tooLong || chat.isPending}
                 className={clsx(
                   'flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-white',
@@ -261,7 +262,7 @@ export function ChatWidget() {
               </button>
             </div>
             <p className="flex justify-between gap-2 px-1 text-caption text-text-subtle">
-              <span>AI answers can be wrong. Not medical advice.</span>
+              <span>{t('chat.disclaimer')}</span>
               {draft.length >= COUNT_FROM && (
                 <span className={clsx(tooLong && 'text-primary-hover')}>
                   {draft.trim().length}/{MAX_LENGTH}
@@ -275,7 +276,7 @@ export function ChatWidget() {
       <button
         ref={buttonRef}
         type="button"
-        aria-label={open ? 'Close assistant' : 'Open assistant'}
+        aria-label={open ? t('chat.close') : t('chat.open')}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         onClick={() => (open ? close() : setOpen(true))}

@@ -1,6 +1,8 @@
 import clsx from 'clsx';
 import { ChevronDown } from 'lucide-react';
 import { useId, type ComponentProps } from 'react';
+import { useTranslation } from 'react-i18next';
+import { translateMessage } from '../../lib/messages';
 
 interface SelectProps extends ComponentProps<'select'> {
   label: string;
@@ -13,7 +15,8 @@ export function Select({ label, error, hint, id, className, children, ...rest }:
   const generatedId = useId();
   const selectId = id ?? generatedId;
   const messageId = `${selectId}-message`;
-  const message = error ?? hint;
+  const { t } = useTranslation();
+  const message = translateMessage(t, error) ?? hint;
 
   return (
     <div className={clsx('flex flex-col gap-1.5', className)}>

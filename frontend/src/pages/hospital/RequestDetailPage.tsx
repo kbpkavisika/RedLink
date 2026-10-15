@@ -1,5 +1,6 @@
 import { ArrowLeft, CheckCircle2, Phone, RefreshCw, Users } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import {
   Badge,
@@ -25,11 +26,14 @@ import { CloseRequestPanel, type CloseMode } from './CloseRequestPanel';
 import { ResponsesPanel } from './ResponsesPanel';
 import type { ApiError, BloodRequestDetail, MatchedDonor, RequestOverview } from '../../types';
 
-const backToRequests = (
-  <LinkButton to="/hospital/requests" variant="outline" leftIcon={<ArrowLeft size={16} aria-hidden="true" />}>
-    Back to requests
-  </LinkButton>
-);
+function BackToRequests() {
+  const { t } = useTranslation();
+  return (
+    <LinkButton to="/hospital/requests" variant="outline" leftIcon={<ArrowLeft size={16} aria-hidden="true" />}>
+      {t('hospital.detail.backToRequests')}
+    </LinkButton>
+  );
+}
 
 /**
  * /hospital/requests/:id (H5, H12): the request, then every donor who can give to it, best match first.
@@ -37,6 +41,7 @@ const backToRequests = (
  * Between them, donors' replies (H7): who is coming, who withdrew, who declined.
  */
 export function RequestDetailPage() {
+  const { t } = useTranslation();
   const id = Number(useParams().id);
   const valid = Number.isInteger(id) && id > 0;
 
@@ -45,9 +50,9 @@ export function RequestDetailPage() {
       <Panel>
         <StateView
           state="error"
-          title="This request doesn't exist"
-          description="Check the link, or open the request from your list."
-          action={backToRequests}
+          title={t('hospital.detail.invalidTitle')}
+          description={t('hospital.detail.invalidBody')}
+          action={<BackToRequests />}
         />
       </Panel>
     );
@@ -91,24 +96,25 @@ function RequestDetail({ id }: { id: number }) {
 }
 
 function RequestError({ error, retrying, onRetry }: { error: ApiError; retrying: boolean; onRetry: () => void }) {
+  const { t } = useTranslation();
   if (error.status === 404) {
     return (
       <StateView
         state="error"
-        title="We couldn't find this request"
-        description="It may belong to another hospital, or the link is wrong."
-        action={backToRequests}
+        title={t('hospital.detail.notFoundTitle')}
+        description={t('hospital.detail.notFoundBody')}
+        action={<BackToRequests />}
       />
     );
   }
   return (
     <StateView
       state="error"
-      title="We couldn't load this request"
+      title={t('hospital.detail.loadError')}
       error={error}
       action={
         <Button loading={retrying} onClick={onRetry} leftIcon={<RefreshCw size={16} className="stroke-2" aria-hidden="true" />}>
-          Try again
+          {t('common.tryAgain')}
         </Button>
       }
     />
@@ -122,8 +128,9 @@ interface RequestSummaryProps {
 }
 
 function RequestSummary({ overview, onClose }: RequestSummaryProps) {
+  const { t } = useTranslation();
   const { request, notifiedCount, donatedDonorIds } = overview;
-  const status = REQUEST_STATUS[request.status];
+  const statusLabel = t(`status.request.${request.status}`);
   return (
     <Panel padded>
       <div className="flex flex-col gap-5">
@@ -131,39 +138,38 @@ function RequestSummary({ overview, onClose }: RequestSummaryProps) {
           <BloodGroupBadge group={request.bloodGroup} />
           <h2 className="font-display text-display-sm text-ink">#{request.reference}</h2>
           <UrgencyTag urgency={request.urgency} />
-          <Badge tone={status.tone}>{status.label}</Badge>
+          <Badge tone={REQUEST_STATUS[request.status].tone}>{statusLabel}</Badge>
           {onClose && (
             <div className="ml-auto flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => onClose('cancel')}>
-                Cancel request
+                {t('hospital.detail.cancelRequest')}
               </Button>
               <Button onClick={() => onClose('fulfil')} leftIcon={<CheckCircle2 size={16} aria-hidden="true" />}>
-                Mark fulfilled
+                {t('hospital.detail.markFulfilled')}
               </Button>
             </div>
           )}
         </div>
 
         <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Fact label="Needed">
-            {request.unitsNeeded} {request.unitsNeeded === 1 ? 'unit' : 'units'} of {formatBloodGroup(request.bloodGroup)}
+          <Fact label={t('hospital.detail.needed')}>
+            {t('common.unitsOf', { count: request.unitsNeeded, group: formatBloodGroup(request.bloodGroup) })}
           </Fact>
-          <Fact label="Needed by">{formatInstant(request.neededBy, true)}</Fact>
-          <Fact label="City">{request.city}</Fact>
+          <Fact label={t('common.neededBy')}>{formatInstant(request.neededBy, true)}</Fact>
+          <Fact label={t('common.city')}>{request.city}</Fact>
           {request.status === 'FULFILLED' ? (
-            <Fact label="Donated">
-              {donatedDonorIds.length} {donatedDonorIds.length === 1 ? 'donor' : 'donors'} · {notifiedCount} notified
+            <Fact label={t('hospital.detail.donated')}>
+              {t('hospital.detail.donatedValue', { count: donatedDonorIds.length, notified: notifiedCount })}
             </Fact>
           ) : (
-            <Fact label="Notified when posted">
-              {notifiedCount} {notifiedCount === 1 ? 'donor' : 'donors'}
-            </Fact>
+            <Fact label={t('hospital.detail.notifiedWhenPosted')}>{t('common.donorCount', { count: notifiedCount })}</Fact>
           )}
         </dl>
 
         <p className="text-caption text-text-subtle">
-          Posted by {request.createdBy} on {formatInstant(request.createdAt, true)}
-          {request.closedAt && ` · ${status.label} ${formatInstant(request.closedAt, true)}`}
+          {t('hospital.detail.postedBy', { name: request.createdBy, date: formatInstant(request.createdAt, true) })}
+          {request.closedAt &&
+            ` · ${t('hospital.detail.closedOn', { status: statusLabel, date: formatInstant(request.closedAt, true) })}`}
         </p>
       </div>
     </Panel>
@@ -179,69 +185,10 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-const columns: Column<MatchedDonor & { rank: number }>[] = [
-  {
-    key: 'rank',
-    header: <span className="sr-only">Rank</span>,
-    cell: (match) => <span className="font-mono text-caption text-text-subtle">{match.rank}</span>,
-    className: 'w-10',
-  },
-  {
-    key: 'donor',
-    header: 'Donor',
-    cell: (match) => (
-      <div className="flex items-center gap-3">
-        <BloodGroupBadge group={match.bloodGroup} />
-        <div className="min-w-0">
-          <p className="truncate font-medium">{match.name}</p>
-          <p className="text-caption text-text-subtle">{match.city}</p>
-        </div>
-      </div>
-    ),
-  },
-  {
-    key: 'why',
-    header: 'Match',
-    cell: (match) => (
-      <div className="flex flex-wrap gap-1.5">
-        {match.exactMatch ? <Badge tone="success">Exact group</Badge> : <Badge>Compatible</Badge>}
-        {match.sameCity && <Badge tone="info">Same city</Badge>}
-      </div>
-    ),
-  },
-  {
-    key: 'last',
-    header: 'Last donation',
-    cell: (match) =>
-      match.daysSinceLastDonation === null ? (
-        <span className="text-text-subtle">Never</span>
-      ) : (
-        <span className="whitespace-nowrap">{match.daysSinceLastDonation} days ago</span>
-      ),
-  },
-  {
-    key: 'phone',
-    header: 'Phone',
-    align: 'right',
-    cell: (match) =>
-      match.phone ? (
-        <a
-          href={`tel:${match.phone}`}
-          className="inline-flex items-center gap-1.5 whitespace-nowrap no-underline"
-          aria-label={`Call ${match.name}, ${match.phone}`}
-        >
-          <Phone size={14} aria-hidden="true" />
-          {match.phone}
-        </a>
-      ) : (
-        <span className="text-text-subtle">—</span>
-      ),
-  },
-];
-
 const MATCH_FILTERS = ['q', 'group', 'city'] as const;
 
 function MatchList({ request }: { request: BloodRequestDetail }) {
+  const { t } = useTranslation();
   const filters = useUrlFilters(MATCH_FILTERS);
   const groups = compatibleDonorGroups(request.bloodGroup);
   const group = groups.find((g) => g === filters.values.group) ?? '';
@@ -259,25 +206,94 @@ function MatchList({ request }: { request: BloodRequestDetail }) {
 
   const open = request.status === 'OPEN';
 
+  const columns: Column<MatchedDonor & { rank: number }>[] = [
+    {
+      key: 'rank',
+      header: <span className="sr-only">{t('hospital.detail.rank')}</span>,
+      cell: (match) => <span className="font-mono text-caption text-text-subtle">{match.rank}</span>,
+      className: 'w-10',
+    },
+    {
+      key: 'donor',
+      header: t('common.donor'),
+      cell: (match) => (
+        <div className="flex items-center gap-3">
+          <BloodGroupBadge group={match.bloodGroup} />
+          <div className="min-w-0">
+            <p className="truncate font-medium">{match.name}</p>
+            <p className="text-caption text-text-subtle">{match.city}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'why',
+      header: t('hospital.detail.match'),
+      cell: (match) => (
+        <div className="flex flex-wrap gap-1.5">
+          {match.exactMatch ? (
+            <Badge tone="success">{t('hospital.detail.exactGroup')}</Badge>
+          ) : (
+            <Badge>{t('hospital.detail.compatible')}</Badge>
+          )}
+          {match.sameCity && <Badge tone="info">{t('hospital.detail.sameCity')}</Badge>}
+        </div>
+      ),
+    },
+    {
+      key: 'last',
+      header: t('hospital.detail.lastDonation'),
+      cell: (match) =>
+        match.daysSinceLastDonation === null ? (
+          <span className="text-text-subtle">{t('common.never')}</span>
+        ) : (
+          <span className="whitespace-nowrap">{t('time.daysAgo', { count: match.daysSinceLastDonation })}</span>
+        ),
+    },
+    {
+      key: 'phone',
+      header: t('common.phone'),
+      align: 'right',
+      cell: (match) =>
+        match.phone ? (
+          <a
+            href={`tel:${match.phone}`}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap no-underline"
+            aria-label={t('common.callLabel', { name: match.name, phone: match.phone })}
+          >
+            <Phone size={14} aria-hidden="true" />
+            {match.phone}
+          </a>
+        ) : (
+          <span className="text-text-subtle">—</span>
+        ),
+    },
+  ];
+
   const toolbar = open && (
     <FilterBar active={filters.active} onClear={filters.clear}>
-      <SearchInput label="Search matched donors" placeholder="Donor name or phone" value={q} onChange={(value) => filters.set('q', value)} />
+      <SearchInput
+        label={t('hospital.detail.searchMatches')}
+        placeholder={t('common.namePhonePlaceholder')}
+        value={q}
+        onChange={(value) => filters.set('q', value)}
+      />
       <FilterSelect
-        label="Blood group"
-        allLabel="All compatible groups"
+        label={t('common.bloodGroup')}
+        allLabel={t('hospital.detail.allCompatible')}
         value={group}
         onChange={(value) => filters.set('group', value)}
         options={groups.map((g) => ({
           value: g,
-          label: `${formatBloodGroup(g)}${g === request.bloodGroup ? ' (exact)' : ''}`,
+          label: g === request.bloodGroup ? t('hospital.detail.exactSuffix', { group: formatBloodGroup(g) }) : formatBloodGroup(g),
         }))}
       />
       <FilterSelect
-        label="City"
-        allLabel="All cities"
+        label={t('common.city')}
+        allLabel={t('common.allCities')}
         value={sameCity ? 'same' : ''}
         onChange={(value) => filters.set('city', value)}
-        options={[{ value: 'same', label: `${request.city} only` }]}
+        options={[{ value: 'same', label: t('hospital.detail.cityOnly', { city: request.city }) }]}
       />
     </FilterBar>
   );
@@ -288,8 +304,8 @@ function MatchList({ request }: { request: BloodRequestDetail }) {
       <StateView
         state="empty"
         icon={Users}
-        title="This request is closed"
-        description="Closed requests aren't matched any more, so nobody else will be contacted."
+        title={t('hospital.detail.closedTitle')}
+        description={t('hospital.detail.closedBody')}
       />
     );
   } else if (isPending) {
@@ -298,7 +314,7 @@ function MatchList({ request }: { request: BloodRequestDetail }) {
     body = (
       <StateView
         state="error"
-        title="We couldn't load matches"
+        title={t('hospital.detail.matchesLoadError')}
         error={error}
         action={
           <Button
@@ -306,34 +322,41 @@ function MatchList({ request }: { request: BloodRequestDetail }) {
             onClick={() => void refetch()}
             leftIcon={<RefreshCw size={16} className="stroke-2" aria-hidden="true" />}
           >
-            Try again
+            {t('common.tryAgain')}
           </Button>
         }
       />
     );
   } else if (rows.length === 0 && filters.active) {
     // H12: say which filters found nobody, and offer the widest useful alternative
-    const what = group ? `${formatBloodGroup(group)} donors` : 'compatible donors';
-    const where = sameCity ? ` in ${request.city}` : '';
-    const named = q ? ` named "${q}"` : '';
+    const groupLabel = group ? formatBloodGroup(group) : '';
+    const title = q
+      ? t('hospital.detail.noEligibleNamed', { q })
+      : group && sameCity
+        ? t('hospital.detail.noEligibleGroupCity', { group: groupLabel, city: request.city })
+        : group
+          ? t('hospital.detail.noEligibleGroup', { group: groupLabel })
+          : sameCity
+            ? t('hospital.detail.noEligibleCity', { city: request.city })
+            : t('hospital.detail.noEligible');
     body = (
       <StateView
         state="no-results"
-        title={`No eligible ${what}${where}${named}`}
-        description="Every donor shown here is available and hasn't donated in the last 90 days. Widen the search to see more."
+        title={title}
+        description={t('hospital.detail.noEligibleBody')}
         secondaryAction={
           <Button variant="outline" onClick={filters.clear}>
-            Clear filters
+            {t('common.clearFilters')}
           </Button>
         }
         action={
           group ? (
             <Button variant="dark" onClick={() => filters.set('group', null)}>
-              Show compatible
+              {t('hospital.detail.showCompatible')}
             </Button>
           ) : sameCity ? (
             <Button variant="dark" onClick={() => filters.set('city', null)}>
-              Show all cities
+              {t('hospital.detail.showAllCities')}
             </Button>
           ) : undefined
         }
@@ -344,15 +367,15 @@ function MatchList({ request }: { request: BloodRequestDetail }) {
       <StateView
         state="empty"
         icon={Users}
-        title="No matching donors right now"
-        description={`No donor who can give ${formatBloodGroup(request.bloodGroup)} is available and eligible today. The request stays open, and new matches appear here as donors become eligible.`}
+        title={t('hospital.detail.noMatchingNow')}
+        description={t('hospital.detail.noMatchingNowBody', { group: formatBloodGroup(request.bloodGroup) })}
       />
     );
   } else {
     body = (
       <div aria-busy={isPlaceholderData || undefined} className={isPlaceholderData ? 'opacity-60 transition-opacity' : undefined}>
         <Table
-          caption={`Donors who can give to #${request.reference}, best match first`}
+          caption={t('hospital.detail.matchesCaption', { ref: request.reference })}
           rows={rows}
           rowKey={(match) => match.donorId}
           columns={columns}
@@ -363,11 +386,13 @@ function MatchList({ request }: { request: BloodRequestDetail }) {
 
   return (
     <Panel
-      title="Matched donors"
+      title={t('hospital.detail.matchedDonors')}
       actions={
         open && matches && matches.length > 0 && (
           <span className="text-label text-text-subtle">
-            {filters.active ? `${rows.length} shown` : `${matches.length} total`} · best match first
+            {filters.active
+              ? t('hospital.detail.shownCount', { count: rows.length })
+              : t('hospital.detail.totalCount', { count: matches.length })}
           </span>
         )
       }

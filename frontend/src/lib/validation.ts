@@ -1,27 +1,29 @@
 import { z } from 'zod';
+import { msg } from './messages';
 
 // Form rules that mirror the backend's checks, so most mistakes are caught before the request is sent.
 // The backend still checks everything; its field errors are shown with applyFieldErrors.
+// Messages are translation keys (msg), translated by the input that shows them.
 
-export const fullNameField = z.string().trim().min(1, 'Enter your full name').max(150, 'Use at most 150 characters');
+export const fullNameField = z.string().trim().min(1, msg('enterFullName')).max(150, msg('tooLong', 150));
 
 export const emailField = z
   .string()
   .trim()
-  .min(1, 'Enter your email')
-  .max(255, 'Use at most 255 characters')
-  .pipe(z.email('Enter a valid email, e.g. name@example.lk'));
+  .min(1, msg('enterEmail'))
+  .max(255, msg('tooLong', 255))
+  .pipe(z.email(msg('validEmail')));
 
 // Sri Lankan phone: spaces and dashes are removed, then 10 digits starting with 0 (backend: Inputs.PHONE_PATTERN)
 export const phoneField = z
   .string()
   .transform((value) => value.replace(/[\s-]/g, ''))
-  .pipe(z.string().regex(/^0\d{9}$/, 'Enter 10 digits starting with 0, e.g. 0771234567'));
+  .pipe(z.string().regex(/^0\d{9}$/, msg('phone')));
 
 // BCrypt only uses the first 72 bytes, so the backend allows 8–72 characters
-export const newPasswordField = z.string().min(8, 'Use at least 8 characters').max(72, 'Use at most 72 characters');
+export const newPasswordField = z.string().min(8, msg('tooShort', 8)).max(72, msg('tooLong', 72));
 
-export const cityField = z.string().trim().min(1, 'Enter your city').max(100, 'Use at most 100 characters');
+export const cityField = z.string().trim().min(1, msg('enterCity')).max(100, msg('tooLong', 100));
 
 /** Whole years between a "YYYY-MM-DD" birth date and today, counted the same way as Java's Period.between. */
 export function ageOn(dateOfBirth: string, today: Date = new Date()): number {

@@ -1,5 +1,6 @@
 import { Search, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface SearchInputProps {
   // The committed search (e.g. from the URL); onChange is called with the new one after typing pauses
@@ -16,7 +17,8 @@ interface SearchInputProps {
  * The search box for table toolbars. Typing updates the box at once but only reports a new search
  * once typing pauses (300 ms), so the table doesn't jump on every key. ✕ clears it straight away.
  */
-export function SearchInput({ value, onChange, label, placeholder = 'Search…', delay = 300, className }: SearchInputProps) {
+export function SearchInput({ value, onChange, label, placeholder, delay = 300, className }: SearchInputProps) {
+  const { t } = useTranslation();
   const [text, setText] = useState(value);
   const [synced, setSynced] = useState(value);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -51,7 +53,7 @@ export function SearchInput({ value, onChange, label, placeholder = 'Search…',
       <input
         type="search"
         aria-label={label}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('ui.search')}
         value={text}
         onChange={(event) => type(event.target.value)}
         onKeyDown={(event) => event.key === 'Escape' && text && clear()}
@@ -60,7 +62,7 @@ export function SearchInput({ value, onChange, label, placeholder = 'Search…',
       {text && (
         <button
           type="button"
-          aria-label="Clear search"
+          aria-label={t('ui.clearSearch')}
           onClick={clear}
           className="hit-target absolute top-1/2 right-1.5 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-text-subtle hover:bg-bg hover:text-ink focus-visible:shadow-focus focus-visible:outline-none"
         >

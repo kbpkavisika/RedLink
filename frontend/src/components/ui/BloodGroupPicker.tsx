@@ -1,7 +1,9 @@
 import clsx from 'clsx';
 import { useId } from 'react';
 import type { UseFormRegisterReturn } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { formatBloodGroup } from '../../lib/format';
+import { translateMessage } from '../../lib/messages';
 import { BLOOD_GROUPS } from '../../types';
 
 interface BloodGroupPickerProps {
@@ -15,7 +17,8 @@ interface BloodGroupPickerProps {
 // The 8 blood groups as one radio group of tiles. Arrow keys move between them, like any radio group.
 export function BloodGroupPicker({ legend, error, hint, registration }: BloodGroupPickerProps) {
   const messageId = useId();
-  const message = error ?? hint;
+  const { t } = useTranslation();
+  const message = translateMessage(t, error) ?? hint;
 
   return (
     <fieldset aria-describedby={message ? messageId : undefined} className="flex flex-col gap-1.5">

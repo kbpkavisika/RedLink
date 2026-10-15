@@ -1,4 +1,6 @@
+import i18n from '../i18n';
 import type { NotificationItem, Role } from '../types';
+import { formatDayMonth } from './format';
 import { homePathFor } from './roles';
 
 /**
@@ -18,17 +20,13 @@ export function notificationLink(item: NotificationItem, role: Role): string {
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
-const shortDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 
-// "Just now", "5 min ago", "3 h ago", "2 days ago", then "6 Oct"
+// "Just now", "5 min ago", "3 h ago", "2 days ago", then "6 Oct", in the chosen language
 export function timeAgo(iso: string, now = Date.now()): string {
   const elapsed = now - new Date(iso).getTime();
-  if (elapsed < MINUTE) return 'Just now';
-  if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)} min ago`;
-  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)} h ago`;
-  if (elapsed < 7 * DAY) {
-    const days = Math.floor(elapsed / DAY);
-    return `${days} ${days === 1 ? 'day' : 'days'} ago`;
-  }
-  return shortDate.format(new Date(iso));
+  if (elapsed < MINUTE) return i18n.t('time.justNow');
+  if (elapsed < HOUR) return i18n.t('time.minutesAgo', { count: Math.floor(elapsed / MINUTE) });
+  if (elapsed < DAY) return i18n.t('time.hoursAgo', { count: Math.floor(elapsed / HOUR) });
+  if (elapsed < 7 * DAY) return i18n.t('time.daysAgo', { count: Math.floor(elapsed / DAY) });
+  return formatDayMonth(iso);
 }

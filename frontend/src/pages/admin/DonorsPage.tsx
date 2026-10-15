@@ -1,4 +1,5 @@
 import { RefreshCw, Users } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   Badge,
   BloodGroupBadge,
@@ -33,42 +34,6 @@ function canDonate(donor: DonorSummary): boolean {
   return donor.lastDonationDate === null || daysSince(donor.lastDonationDate) >= DAYS_BETWEEN_DONATIONS;
 }
 
-const columns: Column<DonorSummary>[] = [
-  {
-    key: 'donor',
-    header: 'Donor',
-    cell: (donor) => (
-      <div className="flex items-center gap-3">
-        <BloodGroupBadge group={donor.bloodGroup} />
-        <div className="min-w-0">
-          <p className="truncate font-medium">{donor.name}</p>
-          <p className="text-caption text-text-subtle">{donor.city}</p>
-        </div>
-      </div>
-    ),
-  },
-  { key: 'phone', header: 'Phone', cell: (donor) => donor.phone },
-  {
-    key: 'lastDonation',
-    header: 'Last donation',
-    cell: (donor) =>
-      donor.lastDonationDate ? (
-        <div>
-          <p className="whitespace-nowrap">{formatDate(donor.lastDonationDate)}</p>
-          {!canDonate(donor) && <p className="text-caption text-warning">Waiting 90 days</p>}
-        </div>
-      ) : (
-        <span className="text-text-subtle">Never</span>
-      ),
-  },
-  {
-    key: 'status',
-    header: 'Status',
-    align: 'right',
-    cell: (donor) => (donor.available ? <Badge tone="success">Available</Badge> : <Badge>Paused</Badge>),
-  },
-];
-
 const FILTERS = ['q', 'group', 'city', 'status', 'eligibility'] as const;
 
 /**
@@ -77,6 +42,7 @@ const FILTERS = ['q', 'group', 'city', 'status', 'eligibility'] as const;
  * Reference page for data views: one query, one Panel, a FilterBar, and a StateView for every other state.
  */
 export function DonorsPage() {
+  const { t } = useTranslation();
   const { data: donors, isPending, isError, error, refetch, isRefetching } = useDonors();
   const filters = useUrlFilters(FILTERS);
   const { q, group, city, status, eligibility } = filters.values;
@@ -92,56 +58,89 @@ export function DonorsPage() {
       (!eligibility || (eligibility === 'now') === canDonate(donor)),
   );
 
-  const describe = [
-    group && `${formatBloodGroup(group as DonorSummary['bloodGroup'])} donors`,
-    city && `in ${city}`,
-    q && `matching "${q}"`,
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const columns: Column<DonorSummary>[] = [
+    {
+      key: 'donor',
+      header: t('common.donor'),
+      cell: (donor) => (
+        <div className="flex items-center gap-3">
+          <BloodGroupBadge group={donor.bloodGroup} />
+          <div className="min-w-0">
+            <p className="truncate font-medium">{donor.name}</p>
+            <p className="text-caption text-text-subtle">{donor.city}</p>
+          </div>
+        </div>
+      ),
+    },
+    { key: 'phone', header: t('common.phone'), cell: (donor) => donor.phone },
+    {
+      key: 'lastDonation',
+      header: t('hospital.detail.lastDonation'),
+      cell: (donor) =>
+        donor.lastDonationDate ? (
+          <div>
+            <p className="whitespace-nowrap">{formatDate(donor.lastDonationDate)}</p>
+            {!canDonate(donor) && <p className="text-caption text-warning">{t('admin.donors.waiting')}</p>}
+          </div>
+        ) : (
+          <span className="text-text-subtle">{t('common.never')}</span>
+        ),
+    },
+    {
+      key: 'status',
+      header: t('common.status'),
+      align: 'right',
+      cell: (donor) =>
+        donor.available ? (
+          <Badge tone="success">{t('admin.donors.available')}</Badge>
+        ) : (
+          <Badge>{t('admin.donors.paused')}</Badge>
+        ),
+    },
+  ];
 
   return (
-    <Panel title="Donors">
+    <Panel title={t('admin.donors.title')}>
       {donors && donors.length > 0 && (
         <FilterBar shown={rows.length} total={donors.length} active={filters.active} onClear={filters.clear}>
           <SearchInput
-            label="Search donors"
-            placeholder="Name, phone or city"
+            label={t('admin.donors.search')}
+            placeholder={t('admin.donors.searchPlaceholder')}
             value={q}
             onChange={(value) => filters.set('q', value)}
           />
           <FilterSelect
-            label="Blood group"
-            allLabel="All groups"
+            label={t('common.bloodGroup')}
+            allLabel={t('common.allGroups')}
             value={group}
             onChange={(value) => filters.set('group', value)}
             options={BLOOD_GROUPS.map((g) => ({ value: g, label: formatBloodGroup(g) }))}
           />
           <FilterSelect
-            label="City"
-            allLabel="All cities"
+            label={t('common.city')}
+            allLabel={t('common.allCities')}
             value={city}
             onChange={(value) => filters.set('city', value)}
             options={cities.map((c) => ({ value: c, label: c }))}
           />
           <FilterSelect
-            label="Availability"
-            allLabel="Any availability"
+            label={t('admin.donors.availability')}
+            allLabel={t('admin.donors.anyAvailability')}
             value={status}
             onChange={(value) => filters.set('status', value)}
             options={[
-              { value: 'available', label: 'Available' },
-              { value: 'paused', label: 'Paused' },
+              { value: 'available', label: t('admin.donors.available') },
+              { value: 'paused', label: t('admin.donors.paused') },
             ]}
           />
           <FilterSelect
-            label="Eligibility"
-            allLabel="Any eligibility"
+            label={t('admin.donors.eligibility')}
+            allLabel={t('admin.donors.anyEligibility')}
             value={eligibility}
             onChange={(value) => filters.set('eligibility', value)}
             options={[
-              { value: 'now', label: 'Can donate now' },
-              { value: 'waiting', label: 'Waiting 90 days' },
+              { value: 'now', label: t('admin.donors.canDonateNow') },
+              { value: 'waiting', label: t('admin.donors.waiting') },
             ]}
           />
         </FilterBar>
@@ -152,7 +151,7 @@ export function DonorsPage() {
       ) : isError ? (
         <StateView
           state="error"
-          title="We couldn't load donors"
+          title={t('admin.donors.loadError')}
           error={error}
           action={
             <Button
@@ -160,7 +159,7 @@ export function DonorsPage() {
               onClick={() => void refetch()}
               leftIcon={<RefreshCw size={16} className="stroke-2" aria-hidden="true" />}
             >
-              Try again
+              {t('common.tryAgain')}
             </Button>
           }
         />
@@ -168,22 +167,22 @@ export function DonorsPage() {
         <StateView
           state="empty"
           icon={Users}
-          title="No donors yet"
-          description="Donors appear here as soon as they register, ready to be matched to hospital requests."
+          title={t('admin.donors.emptyTitle')}
+          description={t('admin.donors.emptyBody')}
         />
       ) : rows.length === 0 ? (
         <StateView
           state="no-results"
-          title={describe ? `No ${describe}` : 'No donors match these filters'}
-          description="Try another search, or clear the filters to see every donor."
+          title={t('admin.donors.noMatch')}
+          description={t('admin.donors.noMatchBody')}
           action={
             <Button variant="outline" onClick={filters.clear}>
-              Clear filters
+              {t('common.clearFilters')}
             </Button>
           }
         />
       ) : (
-        <Table caption="Registered donors" rows={rows} rowKey={(donor) => donor.id} columns={columns} />
+        <Table caption={t('admin.donors.caption')} rows={rows} rowKey={(donor) => donor.id} columns={columns} />
       )}
     </Panel>
   );

@@ -1,11 +1,10 @@
 import { RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { Trans, useTranslation } from 'react-i18next';
 import { Outlet } from 'react-router-dom';
 import { Button, Panel, StateView, StepProgress } from '../components/ui';
 import { useAuth } from './useAuth';
-
-const approvalSteps = ['Registered', 'Under review', 'Approved'];
 
 /**
  * Wraps every /hospital page (H2, business rule 1): staff of a hospital that isn't APPROVED see its approval
@@ -15,6 +14,7 @@ const approvalSteps = ['Registered', 'Under review', 'Approved'];
  * Only for convenience: the backend refuses to post requests for a hospital that isn't approved.
  */
 export function HospitalApprovalGate() {
+  const { t } = useTranslation();
   const { user, refreshUser } = useAuth();
   const [checking, setChecking] = useState(false);
   const status = user?.hospitalStatus;
@@ -41,31 +41,33 @@ export function HospitalApprovalGate() {
       await refreshUser();
       // If it's now APPROVED, the gate re-renders with the page instead
     } catch {
-      toast.error("We couldn't check right now. Please try again.");
+      toast.error(t('auth.approval.checkFailed'));
     } finally {
       setChecking(false);
     }
   };
 
-  const hospital = user?.hospitalName ?? 'Your hospital';
+  const hospital = user?.hospitalName ?? t('auth.approval.yourHospital');
+  const approvalSteps = [t('auth.approval.registered'), t('auth.approval.underReview'), t('auth.approval.approved')];
 
   if (status === 'REJECTED') {
     return (
       <Panel>
         <StateView
           state="blocked"
-          title="Registration was not approved"
+          title={t('auth.approval.rejectedTitle')}
           description={
-            <>
-              {hospital} can't post blood requests. Contact <a href="mailto:admin@redlink.lk">admin@redlink.lk</a> if
-              you think this is a mistake or want to register again.
-            </>
+            <Trans
+              i18nKey="auth.approval.rejectedBody"
+              values={{ hospital }}
+              components={{ link: <a href="mailto:admin@redlink.lk" /> }}
+            />
           }
         >
           <StepProgress steps={approvalSteps} current={1} tone="error" />
           {user?.hospitalRejectionReason && (
             <p className="max-w-[360px] rounded-lg border border-dashed border-border-strong px-4 py-3 text-left text-label text-text-muted">
-              <span className="font-semibold text-ink">Reason from the admin:</span> {user.hospitalRejectionReason}
+              <span className="font-semibold text-ink">{t('auth.approval.reason')}</span> {user.hospitalRejectionReason}
             </p>
           )}
         </StateView>
@@ -77,8 +79,8 @@ export function HospitalApprovalGate() {
     <Panel>
       <StateView
         state="blocked"
-        title="Posting unlocks after approval"
-        description={`An admin is reviewing ${hospital}'s registration. This usually takes 1–2 working days.`}
+        title={t('auth.approval.pendingTitle')}
+        description={t('auth.approval.pendingBody', { hospital })}
         action={
           <Button
             variant="outline"
@@ -86,7 +88,7 @@ export function HospitalApprovalGate() {
             leftIcon={<RefreshCw size={16} aria-hidden="true" />}
             onClick={checkAgain}
           >
-            Check again
+            {t('auth.approval.checkAgain')}
           </Button>
         }
       >

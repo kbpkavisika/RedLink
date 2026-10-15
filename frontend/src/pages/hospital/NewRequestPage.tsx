@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { ArrowRight } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useForm, type UseFormRegisterReturn } from 'react-hook-form';
+import { Trans, useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useAuth } from '../../auth/useAuth';
 import {
@@ -18,36 +19,32 @@ import { useCreateRequest } from '../../hooks/useRequests';
 import { CITIES } from '../../lib/cities';
 import { applyFieldErrors } from '../../lib/formErrors';
 import { formatBloodGroup } from '../../lib/format';
+import { msg, translateMessage } from '../../lib/messages';
 import { BLOOD_GROUPS, type ApiError, type PostedRequestResponse, type Urgency } from '../../types';
 
-const URGENCIES: { value: Urgency; label: string }[] = [
-  { value: 'LOW', label: 'Low' },
-  { value: 'MEDIUM', label: 'Medium' },
-  { value: 'HIGH', label: 'High' },
-  { value: 'CRITICAL', label: 'Critical' },
-];
+const URGENCIES: Urgency[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
 // Same rules as the backend (CreateBloodRequestRequest), so most mistakes never leave the browser
 const schema = z.object({
-  bloodGroup: z.enum(BLOOD_GROUPS, { error: 'Choose the blood group needed' }),
+  bloodGroup: z.enum(BLOOD_GROUPS, { error: msg('chooseBloodGroupNeeded') }),
   unitsNeeded: z
     .string()
-    .min(1, 'Enter how many units')
+    .min(1, msg('enterUnits'))
     .transform(Number)
     .pipe(
       z
-        .number({ error: 'Enter a number' })
-        .int('Use a whole number')
-        .min(1, 'At least 1 unit')
-        .max(20, 'At most 20 units. Post a second request for more.'),
+        .number({ error: msg('enterNumber') })
+        .int(msg('wholeNumber'))
+        .min(1, msg('minUnits'))
+        .max(20, msg('maxUnits')),
     ),
-  urgency: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'], { error: 'Choose how urgent it is' }),
-  city: z.string().trim().min(1, 'Enter the city where it is needed').max(100, 'Use at most 100 characters'),
+  urgency: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'], { error: msg('chooseUrgency') }),
+  city: z.string().trim().min(1, msg('enterNeededCity')).max(100, msg('tooLong', 100)),
   neededBy: z
     .string()
-    .min(1, 'Choose when it is needed by')
+    .min(1, msg('chooseNeededBy'))
     // datetime-local has no time zone, so new Date() reads it as the viewer's local time
-    .refine((value) => new Date(value).getTime() > Date.now(), 'Choose a time in the future')
+    .refine((value) => new Date(value).getTime() > Date.now(), msg('futureTime'))
     .transform((value) => new Date(value).toISOString()),
 });
 
@@ -74,6 +71,7 @@ function defaultNeededBy(): string {
  * Posting saves the request and notifies the top matches in one call; the success screen says how many.
  */
 export function NewRequestPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const createRequest = useCreateRequest();
   const [posted, setPosted] = useState<PostedRequestResponse | null>(null);
@@ -123,30 +121,28 @@ export function NewRequestPage() {
     <Panel className="mx-auto max-w-[720px]">
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-6 p-5 sm:p-8">
         <div className="flex flex-col gap-1">
-          <h2 className="font-display text-display-sm text-ink">Request blood</h2>
-          <p className="text-body text-text-muted">
-            RedLink ranks every compatible, eligible donor and notifies the best matches as soon as you post.
-          </p>
+          <h2 className="font-display text-display-sm text-ink">{t('hospital.new.title')}</h2>
+          <p className="text-body text-text-muted">{t('hospital.new.subtitle')}</p>
         </div>
 
         <FormAlert>{formError}</FormAlert>
 
         <BloodGroupPicker
-          legend="Blood group needed"
-          hint="Donors of compatible groups are matched too, after exact matches"
+          legend={t('hospital.new.bloodGroup')}
+          hint={t('hospital.new.bloodGroupHint')}
           error={errors.bloodGroup?.message}
           registration={register('bloodGroup')}
         />
 
         <UrgencyPicker
           error={errors.urgency?.message}
-          hint="More urgent requests notify more donors per unit"
+          hint={t('hospital.new.urgencyHint')}
           registration={register('urgency')}
         />
 
         <div className="grid gap-5 sm:grid-cols-2">
           <Input
-            label="Units needed"
+            label={t('hospital.new.units')}
             type="number"
             inputMode="numeric"
             min={1}
@@ -155,7 +151,7 @@ export function NewRequestPage() {
             {...register('unitsNeeded')}
           />
           <Input
-            label="Needed by"
+            label={t('common.neededBy')}
             type="datetime-local"
             min={toDateTimeInput(new Date())}
             error={errors.neededBy?.message}
@@ -164,10 +160,10 @@ export function NewRequestPage() {
         </div>
 
         <Input
-          label="City"
+          label={t('common.city')}
           list="request-city-suggestions"
           autoComplete="off"
-          hint="Donors in this city are ranked first"
+          hint={t('hospital.new.cityHint')}
           error={errors.city?.message}
           {...register('city')}
         />
@@ -179,10 +175,10 @@ export function NewRequestPage() {
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-5">
           <LinkButton to="/hospital/requests" variant="outline">
-            Cancel
+            {t('common.cancel')}
           </LinkButton>
           <Button type="submit" size="lg" loading={isSubmitting}>
-            Post request
+            {t('hospital.new.post')}
           </Button>
         </div>
       </form>
@@ -198,14 +194,15 @@ interface UrgencyPickerProps {
 
 // The four urgencies as one radio group of tiles, like BloodGroupPicker. Red is kept for Critical.
 function UrgencyPicker({ error, hint, registration }: UrgencyPickerProps) {
+  const { t } = useTranslation();
   const messageId = useId();
-  const message = error ?? hint;
+  const message = translateMessage(t, error) ?? hint;
 
   return (
     <fieldset aria-describedby={message ? messageId : undefined} className="flex flex-col gap-1.5">
-      <legend className="mb-1.5 text-label font-medium text-ink">Urgency</legend>
+      <legend className="mb-1.5 text-label font-medium text-ink">{t('common.urgency')}</legend>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {URGENCIES.map(({ value, label }) => (
+        {URGENCIES.map((value) => (
           <label key={value} className="cursor-pointer">
             <input type="radio" value={value} className="peer sr-only" {...registration} />
             <span
@@ -218,7 +215,7 @@ function UrgencyPicker({ error, hint, registration }: UrgencyPickerProps) {
                 error ? 'border-primary' : 'border-border-strong',
               )}
             >
-              {label}
+              {t(`status.urgency.${value}`)}
             </span>
           </label>
         ))}
@@ -234,35 +231,33 @@ function UrgencyPicker({ error, hint, registration }: UrgencyPickerProps) {
 
 // H4: "Request #RQ-1043 is live", how many donors were notified, and the way to the request page
 function PostedState({ posted, onPostAnother }: { posted: PostedRequestResponse; onPostAnother: () => void }) {
+  const { t } = useTranslation();
   const { request, matchCount, notifiedCount } = posted;
-  const units = `${request.unitsNeeded} ${request.unitsNeeded === 1 ? 'unit' : 'units'} of ${formatBloodGroup(request.bloodGroup)}`;
+  const group = formatBloodGroup(request.bloodGroup);
+  const units = t('common.unitsOf', { count: request.unitsNeeded, group });
+  const bold = { b: <strong className="text-ink" /> };
 
   const description =
     matchCount === 0 ? (
-      <>
-        No donors can give {formatBloodGroup(request.bloodGroup)} right now. The request stays open, and its page shows
-        matches as donors become available.
-      </>
+      t('hospital.new.noMatches', { group })
     ) : notifiedCount === matchCount ? (
-      <>
-        We notified all <strong className="text-ink">{matchCount}</strong> matching{' '}
-        {matchCount === 1 ? 'donor' : 'donors'} for {units}. You'll see their replies on the request page.
-      </>
+      <Trans i18nKey="hospital.new.notifiedAll" count={matchCount} values={{ units }} components={bold} />
     ) : (
-      <>
-        We notified the top <strong className="text-ink">{notifiedCount}</strong> of {matchCount} matching donors for{' '}
-        {units}. The rest are listed on the request page if you need to call them.
-      </>
+      <Trans
+        i18nKey="hospital.new.notifiedTop"
+        values={{ notified: notifiedCount, matches: matchCount, units }}
+        components={bold}
+      />
     );
 
   return (
     <StateView
       state="success"
-      title={`Request #${request.reference} is live`}
+      title={t('hospital.new.live', { ref: request.reference })}
       description={description}
       secondaryAction={
         <Button variant="outline" onClick={onPostAnother}>
-          Post another
+          {t('hospital.new.postAnother')}
         </Button>
       }
       action={
@@ -270,7 +265,7 @@ function PostedState({ posted, onPostAnother }: { posted: PostedRequestResponse;
           to={`/hospital/requests/${request.id}`}
           leftIcon={<ArrowRight size={16} className="stroke-2" aria-hidden="true" />}
         >
-          Track responses
+          {t('hospital.new.track')}
         </LinkButton>
       }
     />

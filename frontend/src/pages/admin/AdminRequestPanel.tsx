@@ -1,5 +1,6 @@
 import { ClipboardList, Phone, RefreshCw, X } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Badge,
   BloodGroupBadge,
@@ -19,6 +20,7 @@ import type { AdminRequestDetail, RequestResponse } from '../../types';
  * every reply and who donated. Admins look into problems; the hospital runs its own requests.
  */
 export function AdminRequestPanel({ requestId, onClose }: { requestId: number | null; onClose: () => void }) {
+  const { t } = useTranslation();
   const { data, isPending, isError, error, refetch, isRefetching } = useAdminRequest(requestId);
 
   if (requestId === null) {
@@ -27,8 +29,8 @@ export function AdminRequestPanel({ requestId, onClose }: { requestId: number | 
         <StateView
           state="empty"
           icon={ClipboardList}
-          title="Select a request"
-          description="Choose a request from the list to see its replies and outcome."
+          title={t('admin.requestPanel.selectTitle')}
+          description={t('admin.requestPanel.selectBody')}
         />
       </Panel>
     );
@@ -36,11 +38,11 @@ export function AdminRequestPanel({ requestId, onClose }: { requestId: number | 
 
   return (
     <Panel
-      title={data ? `#${data.request.reference}` : 'Request'}
+      title={data ? `#${data.request.reference}` : t('common.request')}
       actions={
         <>
           {data && <RequestStatusBadge status={data.request.status} />}
-          <Button variant="icon" size="sm" aria-label="Close details" onClick={onClose}>
+          <Button variant="icon" size="sm" aria-label={t('common.closeDetails')} onClick={onClose}>
             <X size={18} aria-hidden="true" />
           </Button>
         </>
@@ -51,7 +53,7 @@ export function AdminRequestPanel({ requestId, onClose }: { requestId: number | 
       ) : isError ? (
         <StateView
           state="error"
-          title={error.status === 404 ? 'This request no longer exists' : "We couldn't load this request"}
+          title={error.status === 404 ? t('admin.requestPanel.gone') : t('hospital.detail.loadError')}
           error={error}
           action={
             error.status !== 404 && (
@@ -60,7 +62,7 @@ export function AdminRequestPanel({ requestId, onClose }: { requestId: number | 
                 onClick={() => void refetch()}
                 leftIcon={<RefreshCw size={16} className="stroke-2" aria-hidden="true" />}
               >
-                Try again
+                {t('common.tryAgain')}
               </Button>
             )
           }
@@ -76,36 +78,39 @@ export function AdminRequestPanel({ requestId, onClose }: { requestId: number | 
 }
 
 function Summary({ detail }: { detail: AdminRequestDetail }) {
+  const { t } = useTranslation();
   const { request } = detail;
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <BloodGroupBadge group={request.bloodGroup} />
         <span className="font-medium text-ink">
-          {request.unitsNeeded} {request.unitsNeeded === 1 ? 'unit' : 'units'} of {formatBloodGroup(request.bloodGroup)}
+          {t('common.unitsOf', { count: request.unitsNeeded, group: formatBloodGroup(request.bloodGroup) })}
         </span>
         <UrgencyTag urgency={request.urgency} />
       </div>
       <dl className="grid gap-3 sm:grid-cols-2">
-        <Fact label="Hospital">{request.hospitalName}</Fact>
-        <Fact label="Hospital phone">
+        <Fact label={t('common.hospital')}>{request.hospitalName}</Fact>
+        <Fact label={t('auth.registerHospital.hospitalPhone')}>
           <a href={`tel:${detail.hospitalPhone}`} className="inline-flex items-center gap-1.5 no-underline">
             <Phone size={14} aria-hidden="true" />
             {detail.hospitalPhone}
           </a>
         </Fact>
-        <Fact label="City">{request.city}</Fact>
-        <Fact label="Needed by">{formatInstant(request.neededBy, true)}</Fact>
-        <Fact label="Posted">
-          {formatInstant(request.createdAt, true)} by {request.createdBy}
+        <Fact label={t('common.city')}>{request.city}</Fact>
+        <Fact label={t('common.neededBy')}>{formatInstant(request.neededBy, true)}</Fact>
+        <Fact label={t('common.posted')}>
+          {t('admin.requestPanel.postedBy', { date: formatInstant(request.createdAt, true), name: request.createdBy })}
         </Fact>
-        <Fact label="Notified when posted">
-          {detail.notifiedCount} {detail.notifiedCount === 1 ? 'donor' : 'donors'}
+        <Fact label={t('hospital.detail.notifiedWhenPosted')}>
+          {t('common.donorCount', { count: detail.notifiedCount })}
         </Fact>
-        {request.closedAt && <Fact label="Closed">{formatInstant(request.closedAt, true)}</Fact>}
+        {request.closedAt && (
+          <Fact label={t('admin.requestPanel.closed')}>{formatInstant(request.closedAt, true)}</Fact>
+        )}
         {request.status === 'FULFILLED' && (
-          <Fact label="Donated">
-            {detail.donatedDonorIds.length} {detail.donatedDonorIds.length === 1 ? 'donor' : 'donors'}
+          <Fact label={t('hospital.detail.donated')}>
+            {t('common.donorCount', { count: detail.donatedDonorIds.length })}
           </Fact>
         )}
       </dl>
@@ -113,34 +118,37 @@ function Summary({ detail }: { detail: AdminRequestDetail }) {
   );
 }
 
-function replyBadge(response: RequestResponse, detail: AdminRequestDetail): { label: string; tone: BadgeTone } {
+type ReplyBadge = 'ACCEPTED' | 'WITHDRAWN' | 'DECLINED' | 'DONATED' | 'DIDNT_DONATE';
+
+function replyBadge(response: RequestResponse, detail: AdminRequestDetail): { badge: ReplyBadge; tone: BadgeTone } {
   if (response.status === 'ACCEPTED') {
     if (detail.request.status === 'FULFILLED') {
       return detail.donatedDonorIds.includes(response.donorId)
-        ? { label: 'Donated', tone: 'success' }
-        : { label: "Didn't donate", tone: 'neutral' };
+        ? { badge: 'DONATED', tone: 'success' }
+        : { badge: 'DIDNT_DONATE', tone: 'neutral' };
     }
-    return { label: 'Coming', tone: 'success' };
+    return { badge: 'ACCEPTED', tone: 'success' };
   }
   return response.status === 'WITHDRAWN'
-    ? { label: "Can't make it", tone: 'warning' }
-    : { label: 'Declined', tone: 'neutral' };
+    ? { badge: 'WITHDRAWN', tone: 'warning' }
+    : { badge: 'DECLINED', tone: 'neutral' };
 }
 
 function Replies({ detail }: { detail: AdminRequestDetail }) {
+  const { t } = useTranslation();
   return (
     <section className="flex flex-col gap-3">
       <h3 className="text-label font-semibold text-ink">
-        Replies <span className="font-normal text-text-subtle">· {detail.responses.length}</span>
+        {t('common.replies')} <span className="font-normal text-text-subtle">· {detail.responses.length}</span>
       </h3>
       {detail.responses.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border-strong px-4 py-3 text-label text-text-muted">
-          No donor has replied to this request.
+          {t('admin.requestPanel.noReplies')}
         </p>
       ) : (
         <ul className="divide-y divide-neutral-soft rounded-xl border border-border">
           {detail.responses.map((response) => {
-            const badge = replyBadge(response, detail);
+            const { badge, tone } = replyBadge(response, detail);
             return (
               <li key={response.donorId} className="flex items-center gap-3 px-4 py-3">
                 <BloodGroupBadge group={response.bloodGroup} />
@@ -150,7 +158,7 @@ function Replies({ detail }: { detail: AdminRequestDetail }) {
                     {response.city} · {formatInstant(response.respondedAt, true)}
                   </span>
                 </span>
-                <Badge tone={badge.tone}>{badge.label}</Badge>
+                <Badge tone={tone}>{t(`status.reply.${badge}`)}</Badge>
               </li>
             );
           })}

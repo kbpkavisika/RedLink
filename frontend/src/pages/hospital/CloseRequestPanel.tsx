@@ -1,6 +1,7 @@
 import { CheckCircle2, X, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import { Trans, useTranslation } from 'react-i18next';
 import { BloodGroupBadge, Button, FormAlert, Panel, StateView } from '../../components/ui';
 import { useCloseRequest, useResponses } from '../../hooks/useRequests';
 import type { BloodRequestDetail } from '../../types';
@@ -19,14 +20,22 @@ interface CloseRequestPanelProps {
  *   cancel: confirm that nobody else should be asked
  */
 export function CloseRequestPanel({ request, mode, onClose }: CloseRequestPanelProps) {
+  const { t } = useTranslation();
   const closeButton = (
-    <Button variant="icon" size="sm" aria-label="Close" onClick={onClose}>
+    <Button variant="icon" size="sm" aria-label={t('common.close')} onClick={onClose}>
       <X size={18} aria-hidden="true" />
     </Button>
   );
 
   return (
-    <Panel title={mode === 'fulfil' ? `Mark #${request.reference} fulfilled` : `Cancel #${request.reference}`} actions={closeButton}>
+    <Panel
+      title={
+        mode === 'fulfil'
+          ? t('hospital.close.fulfilTitle', { ref: request.reference })
+          : t('hospital.close.cancelTitle', { ref: request.reference })
+      }
+      actions={closeButton}
+    >
       {mode === 'fulfil' ? (
         <FulfilForm request={request} onDone={onClose} />
       ) : (
@@ -37,6 +46,7 @@ export function CloseRequestPanel({ request, mode, onClose }: CloseRequestPanelP
 }
 
 function FulfilForm({ request, onDone }: { request: BloodRequestDetail; onDone: () => void }) {
+  const { t } = useTranslation();
   const responses = useResponses(request.id);
   const closeRequest = useCloseRequest(request.id);
   const accepted = (responses.data ?? []).filter((response) => response.status === 'ACCEPTED');
@@ -57,9 +67,7 @@ function FulfilForm({ request, onDone }: { request: BloodRequestDetail; onDone: 
       { status: 'FULFILLED', donorIds: picked },
       {
         onSuccess: () => {
-          toast.success(
-            `#${request.reference} fulfilled. ${picked.length} ${picked.length === 1 ? 'donation' : 'donations'} recorded.`,
-          );
+          toast.success(t('hospital.close.fulfilledToast', { ref: request.reference, count: picked.length }));
           onDone();
         },
       },
@@ -68,28 +76,31 @@ function FulfilForm({ request, onDone }: { request: BloodRequestDetail; onDone: 
   if (responses.isPending) return <StateView state="loading" rows={2} />;
   if (responses.isError) {
     return (
-      <StateView state="error" title="We couldn't load who accepted" error={responses.error} onRetry={() => void responses.refetch()} />
+      <StateView
+        state="error"
+        title={t('hospital.close.acceptedLoadError')}
+        error={responses.error}
+        onRetry={() => void responses.refetch()}
+      />
     );
   }
   if (accepted.length === 0) {
     return (
       <StateView
         state="blocked"
-        title="Nobody has accepted yet"
-        description="Only donors who accepted this request can be recorded as donating. If you got the blood elsewhere, cancel the request instead."
+        title={t('hospital.close.nobodyAccepted')}
+        description={t('hospital.close.nobodyAcceptedBody')}
       />
     );
   }
 
   return (
     <div className="flex flex-col gap-5 p-5">
-      <p className="text-body text-text-muted">
-        Tick everyone who gave blood. Each gets a donation in their history, and can't be asked again for 90 days.
-      </p>
+      <p className="text-body text-text-muted">{t('hospital.close.tickIntro')}</p>
       <FormAlert>{closeRequest.error?.message ?? null}</FormAlert>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="sr-only">Donors who gave blood</legend>
+        <legend className="sr-only">{t('hospital.close.gaveBlood')}</legend>
         {accepted.map((donor) => {
           const checked = !unticked.has(donor.donorId);
           return (
@@ -115,13 +126,20 @@ function FulfilForm({ request, onDone }: { request: BloodRequestDetail; onDone: 
       </fieldset>
 
       <p className="text-label text-text-muted">
-        <strong className="text-ink">{picked.length}</strong> of {accepted.length} donated · {request.unitsNeeded}{' '}
-        {request.unitsNeeded === 1 ? 'unit' : 'units'} were needed
+        <Trans
+          i18nKey="hospital.close.pickedSummary"
+          values={{
+            picked: picked.length,
+            accepted: accepted.length,
+            units: t('common.unit', { count: request.unitsNeeded }),
+          }}
+          components={{ b: <strong className="text-ink" /> }}
+        />
       </p>
 
       <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
         <Button variant="outline" onClick={onDone} disabled={closeRequest.isPending}>
-          Not yet
+          {t('hospital.close.notYet')}
         </Button>
         <Button
           onClick={submit}
@@ -129,7 +147,7 @@ function FulfilForm({ request, onDone }: { request: BloodRequestDetail; onDone: 
           disabled={picked.length === 0}
           leftIcon={<CheckCircle2 size={16} aria-hidden="true" />}
         >
-          Mark fulfilled
+          {t('hospital.close.markFulfilled')}
         </Button>
       </div>
     </div>
@@ -137,6 +155,7 @@ function FulfilForm({ request, onDone }: { request: BloodRequestDetail; onDone: 
 }
 
 function CancelForm({ request, onDone }: { request: BloodRequestDetail; onDone: () => void }) {
+  const { t } = useTranslation();
   const closeRequest = useCloseRequest(request.id);
 
   const submit = () =>
@@ -144,7 +163,7 @@ function CancelForm({ request, onDone }: { request: BloodRequestDetail; onDone: 
       { status: 'CANCELLED' },
       {
         onSuccess: () => {
-          toast.success(`#${request.reference} cancelled.`);
+          toast.success(t('hospital.close.cancelledToast', { ref: request.reference }));
           onDone();
         },
       },
@@ -153,13 +172,12 @@ function CancelForm({ request, onDone }: { request: BloodRequestDetail; onDone: 
   return (
     <div className="flex flex-col gap-5 p-5">
       <p className="text-body text-text-muted">
-        Cancel this request if the blood is no longer needed. Donors stop seeing it, nobody else is asked, and no
-        donations are recorded. <strong className="text-ink">This can't be undone.</strong>
+        <Trans i18nKey="hospital.close.cancelIntro" components={{ b: <strong className="text-ink" /> }} />
       </p>
       <FormAlert>{closeRequest.error?.message ?? null}</FormAlert>
       <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
         <Button variant="outline" onClick={onDone} disabled={closeRequest.isPending}>
-          Keep it open
+          {t('hospital.close.keepOpen')}
         </Button>
         <Button
           variant="dark"
@@ -167,7 +185,7 @@ function CancelForm({ request, onDone }: { request: BloodRequestDetail; onDone: 
           loading={closeRequest.isPending}
           leftIcon={<XCircle size={16} aria-hidden="true" />}
         >
-          Yes, cancel request
+          {t('hospital.close.yesCancel')}
         </Button>
       </div>
     </div>

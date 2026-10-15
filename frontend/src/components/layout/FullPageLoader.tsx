@@ -1,5 +1,8 @@
+import { useTranslation } from 'react-i18next';
+
 // Shown while a saved session is being checked, so the login page doesn't flash first
 export function FullPageLoader() {
+  const { t } = useTranslation();
   return (
     <div className="flex min-h-screen items-center justify-center" aria-busy="true">
       <img
@@ -7,7 +10,7 @@ export function FullPageLoader() {
         alt=""
         className="size-10 animate-pulse motion-reduce:animate-none"
       />
-      <span className="sr-only">Loading RedLink…</span>
+      <span className="sr-only">{t('nav.loadingApp')}</span>
     </div>
   );
 }

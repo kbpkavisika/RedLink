@@ -3,6 +3,7 @@ import { RefreshCw } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
+import { Trans, useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useAuth } from '../../auth/useAuth';
 import { BloodGroupBadge, Button, FormAlert, Input, Panel, StateView } from '../../components/ui';
@@ -23,6 +24,7 @@ const FIELDS = ['fullName', 'phone', 'city'] as const;
  * and date of birth can't (the blood group decides who they're matched to, so an admin corrects it).
  */
 export function DonorProfilePage() {
+  const { t } = useTranslation();
   const profile = useMyProfile();
 
   if (profile.isPending) {
@@ -37,7 +39,7 @@ export function DonorProfilePage() {
       <Panel>
         <StateView
           state="error"
-          title="We couldn't load your profile"
+          title={t('donor.profile.loadError')}
           error={profile.error}
           action={
             <Button
@@ -45,7 +47,7 @@ export function DonorProfilePage() {
               onClick={() => void profile.refetch()}
               leftIcon={<RefreshCw size={16} className="stroke-2" aria-hidden="true" />}
             >
-              Try again
+              {t('common.tryAgain')}
             </Button>
           }
         />
@@ -63,6 +65,7 @@ export function DonorProfilePage() {
 }
 
 function ProfileForm({ me }: { me: DonorProfile }) {
+  const { t } = useTranslation();
   const { refreshUser } = useAuth();
   const updateProfile = useUpdateProfile();
   const [formError, setFormError] = useState<string | null>(null);
@@ -83,7 +86,7 @@ function ProfileForm({ me }: { me: DonorProfile }) {
     try {
       await updateProfile.mutateAsync(values);
       await refreshUser(); // the name in the top bar
-      toast.success('Profile saved.');
+      toast.success(t('donor.profile.saved'));
     } catch (error) {
       const apiError = error as ApiError;
       if (!applyFieldErrors(apiError, setError, FIELDS)) {
@@ -93,24 +96,24 @@ function ProfileForm({ me }: { me: DonorProfile }) {
   });
 
   return (
-    <Panel title="Your details">
+    <Panel title={t('donor.profile.yourDetails')}>
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5 p-5">
         <FormAlert>{formError}</FormAlert>
-        <Input label="Full name" autoComplete="name" error={errors.fullName?.message} {...register('fullName')} />
+        <Input label={t('common.fullName')} autoComplete="name" error={errors.fullName?.message} {...register('fullName')} />
         <Input
-          label="Mobile number"
+          label={t('common.mobileNumber')}
           type="tel"
           inputMode="tel"
           autoComplete="tel"
-          hint="Hospitals call this number when you accept a request"
+          hint={t('donor.profile.phoneHint')}
           error={errors.phone?.message}
           {...register('phone')}
         />
         <Input
-          label="City"
+          label={t('common.city')}
           list="profile-city-suggestions"
           autoComplete="address-level2"
-          hint="Requests in your city are shown first"
+          hint={t('donor.profile.cityHint')}
           error={errors.city?.message}
           {...register('city')}
         />
@@ -121,10 +124,10 @@ function ProfileForm({ me }: { me: DonorProfile }) {
         </datalist>
         <div className="flex flex-wrap justify-end gap-2 pt-1">
           <Button variant="outline" disabled={!isDirty || isSubmitting} onClick={() => reset()}>
-            Undo changes
+            {t('common.undoChanges')}
           </Button>
           <Button type="submit" loading={isSubmitting} disabled={!isDirty}>
-            Save changes
+            {t('common.saveChanges')}
           </Button>
         </div>
       </form>
@@ -133,26 +136,26 @@ function ProfileForm({ me }: { me: DonorProfile }) {
 }
 
 function FixedDetails({ me }: { me: DonorProfile }) {
+  const { t } = useTranslation();
   return (
     <Panel padded>
       <div className="flex flex-col gap-5">
         <div className="flex items-center gap-3">
           <BloodGroupBadge group={me.bloodGroup} size="lg" />
           <div>
-            <p className="text-caption text-text-subtle">Blood group</p>
-            <p className="text-body font-medium text-ink">Decides which requests you're matched to</p>
+            <p className="text-caption text-text-subtle">{t('common.bloodGroup')}</p>
+            <p className="text-body font-medium text-ink">{t('donor.profile.bloodGroupNote')}</p>
           </div>
         </div>
         <dl className="flex flex-col gap-4">
-          <Fact label="Email">{me.email}</Fact>
-          <Fact label="Date of birth">{formatDate(me.dateOfBirth)}</Fact>
-          <Fact label="Last donation">
-            {me.lastDonationDate ? formatDate(me.lastDonationDate) : 'Not yet through RedLink'}
+          <Fact label={t('common.email')}>{me.email}</Fact>
+          <Fact label={t('common.dateOfBirth')}>{formatDate(me.dateOfBirth)}</Fact>
+          <Fact label={t('donor.profile.lastDonation')}>
+            {me.lastDonationDate ? formatDate(me.lastDonationDate) : t('donor.profile.notYet')}
           </Fact>
         </dl>
         <p className="rounded-xl border border-dashed border-border-strong px-4 py-3 text-caption text-text-muted">
-          To correct your email, blood group or date of birth, contact{' '}
-          <a href="mailto:admin@redlink.lk">admin@redlink.lk</a>.
+          <Trans i18nKey="donor.profile.correct" components={{ link: <a href="mailto:admin@redlink.lk" /> }} />
         </p>
       </div>
     </Panel>

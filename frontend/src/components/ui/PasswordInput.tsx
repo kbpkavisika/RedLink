@@ -1,5 +1,6 @@
 import { Eye, EyeOff } from 'lucide-react';
 import { useState, type ComponentProps } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from './Button';
 import { Input } from './Input';
 
@@ -7,6 +8,7 @@ type PasswordInputProps = Omit<ComponentProps<typeof Input>, 'type' | 'rightSlot
 
 // An Input with a show/hide toggle. Works with React Hook Form like Input: {...register('password')}
 export function PasswordInput(props: PasswordInputProps) {
+  const { t } = useTranslation();
   const [shown, setShown] = useState(false);
 
   return (
@@ -17,7 +19,7 @@ export function PasswordInput(props: PasswordInputProps) {
         <Button
           variant="icon"
           size="sm"
-          aria-label={shown ? 'Hide password' : 'Show password'}
+          aria-label={shown ? t('ui.hidePassword') : t('ui.showPassword')}
           aria-pressed={shown}
           onClick={() => setShown((value) => !value)}
         >

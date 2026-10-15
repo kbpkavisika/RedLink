@@ -1,7 +1,9 @@
 import clsx from 'clsx';
+import type { TFunction } from 'i18next';
 import { CalendarClock, Check, HeartHandshake, MapPin, Navigation, Phone, RefreshCw } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import toast from 'react-hot-toast';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { Badge, BloodGroupBadge, Button, Panel, StateView, UrgencyTag } from '../../components/ui';
 import { useIncomingRequests, useMyProfile, useRespond, useWithdraw } from '../../hooks/useDonorSelf';
@@ -16,6 +18,7 @@ import type { DonorProfile, IncomingRequest } from '../../types';
  * Each card has the request reference as its id, so /donor/requests#RQ-12 scrolls to it.
  */
 export function DonorRequestsPage() {
+  const { t } = useTranslation();
   const incoming = useIncomingRequests();
   const profile = useMyProfile();
   useScrollToHash(incoming.isSuccess);
@@ -33,7 +36,7 @@ export function DonorRequestsPage() {
       <Panel>
         <StateView
           state="error"
-          title="We couldn't load your requests"
+          title={t('donor.requests.loadError')}
           error={failed.error ?? undefined}
           action={
             <Button
@@ -41,7 +44,7 @@ export function DonorRequestsPage() {
               onClick={() => void failed.refetch()}
               leftIcon={<RefreshCw size={16} className="stroke-2" aria-hidden="true" />}
             >
-              Try again
+              {t('common.tryAgain')}
             </Button>
           }
         />
@@ -62,8 +65,8 @@ export function DonorRequestsPage() {
         <StateView
           state="empty"
           icon={HeartHandshake}
-          title="No requests right now"
-          description={`When a hospital needs blood you can give (${formatBloodGroup(me.bloodGroup)}), the request appears here and we'll notify you.`}
+          title={t('donor.requests.emptyTitle')}
+          description={t('donor.requests.emptyBody', { group: formatBloodGroup(me.bloodGroup) })}
         />
       </Panel>
     );
@@ -73,8 +76,7 @@ export function DonorRequestsPage() {
     <div className="flex flex-col gap-6">
       {!me.available && (
         <p className="rounded-xl border border-dashed border-border-strong px-4 py-3 text-label text-text-muted">
-          Your alerts are paused, so hospitals don't see you as a match. You can still reply here.{' '}
-          <Link to="/donor">Turn them back on</Link>
+          <Trans i18nKey="donor.requests.pausedNote" components={{ link: <Link to="/donor" /> }} />
         </p>
       )}
 
@@ -84,14 +86,14 @@ export function DonorRequestsPage() {
 
       <section className="flex flex-col gap-4" aria-labelledby="waiting-heading">
         <h2 id="waiting-heading" className="text-eyebrow text-primary uppercase">
-          Needs you now · {waiting.length}
+          {t('donor.requests.needsYouNow', { count: waiting.length })}
         </h2>
         {waiting.length === 0 ? (
           <Panel>
             <StateView
               state="empty"
-              title="You've answered every request"
-              description="New requests for your blood group appear here as hospitals post them."
+              title={t('donor.requests.allAnswered')}
+              description={t('donor.requests.allAnsweredBody')}
             />
           </Panel>
         ) : (
@@ -100,7 +102,7 @@ export function DonorRequestsPage() {
       </section>
 
       {answered.length > 0 && (
-        <Panel title="Answered">
+        <Panel title={t('donor.requests.answered')}>
           <ul className="divide-y divide-neutral-soft">
             {answered.map((request) => (
               <li key={request.requestId} id={request.reference} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
@@ -111,7 +113,9 @@ export function DonorRequestsPage() {
                     #{request.reference} · {request.city}
                   </p>
                 </div>
-                <Badge>{request.myResponse === 'DECLINED' ? 'You declined' : 'You withdrew'}</Badge>
+                <Badge>
+                  {request.myResponse === 'DECLINED' ? t('donor.requests.youDeclined') : t('donor.requests.youWithdrew')}
+                </Badge>
               </li>
             ))}
           </ul>
@@ -130,8 +134,8 @@ function useScrollToHash(ready: boolean) {
   }, [ready, hash]);
 }
 
-function units(request: IncomingRequest) {
-  return `${request.unitsNeeded} ${request.unitsNeeded === 1 ? 'unit' : 'units'} of ${formatBloodGroup(request.bloodGroup)}`;
+function units(t: TFunction, request: IncomingRequest) {
+  return t('common.unitsOf', { count: request.unitsNeeded, group: formatBloodGroup(request.bloodGroup) });
 }
 
 function directionsUrl(request: IncomingRequest) {
@@ -141,6 +145,7 @@ function directionsUrl(request: IncomingRequest) {
 
 // D5–D7: one request waiting for a reply
 function RequestCard({ request, me }: { request: IncomingRequest; me: DonorProfile }) {
+  const { t } = useTranslation();
   const respond = useRespond();
   const [confirmDecline, setConfirmDecline] = useState(false);
   const critical = request.urgency === 'CRITICAL';
@@ -150,7 +155,7 @@ function RequestCard({ request, me }: { request: IncomingRequest; me: DonorProfi
       { requestId: request.requestId, status },
       {
         onSuccess: () =>
-          toast.success(status === 'ACCEPTED' ? 'Thank you! The hospital can see you are coming.' : 'Request declined.'),
+          toast.success(status === 'ACCEPTED' ? t('donor.requests.acceptedToast') : t('donor.requests.declinedToast')),
         onError: (error) => toast.error(error.message),
       },
     );
@@ -173,20 +178,24 @@ function RequestCard({ request, me }: { request: IncomingRequest; me: DonorProfi
               <UrgencyTag urgency={request.urgency} />
             </h3>
             <p className="text-caption text-text-subtle">
-              #{request.reference} · needs {units(request)}
+              {t('donor.requests.needs', { ref: request.reference, units: units(t, request) })}
             </p>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {request.exactMatch ? <Badge tone="success">Your group</Badge> : <Badge>You can give</Badge>}
-            {request.sameCity && <Badge tone="info">Your city</Badge>}
+            {request.exactMatch ? (
+              <Badge tone="success">{t('donor.requests.yourGroup')}</Badge>
+            ) : (
+              <Badge>{t('donor.requests.youCanGive')}</Badge>
+            )}
+            {request.sameCity && <Badge tone="info">{t('donor.requests.yourCity')}</Badge>}
           </div>
         </div>
 
         <dl className="grid gap-3 sm:grid-cols-2">
-          <Detail icon={<CalendarClock size={16} aria-hidden="true" />} label="Needed by">
+          <Detail icon={<CalendarClock size={16} aria-hidden="true" />} label={t('common.neededBy')}>
             {formatInstant(request.neededBy, true)}
           </Detail>
-          <Detail icon={<MapPin size={16} aria-hidden="true" />} label="Where">
+          <Detail icon={<MapPin size={16} aria-hidden="true" />} label={t('donor.requests.where')}>
             {request.hospitalAddress}, {request.city}
           </Detail>
         </dl>
@@ -195,23 +204,23 @@ function RequestCard({ request, me }: { request: IncomingRequest; me: DonorProfi
       <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface-sunken px-5 py-3">
         {!me.eligible && (
           <p className="mr-auto text-caption text-text-muted">
-            You can accept requests from {formatDate(me.nextEligibleDate as string)}.
+            {t('donor.requests.acceptFrom', { date: formatDate(me.nextEligibleDate as string) })}
           </p>
         )}
         {confirmDecline ? (
           <>
-            <p className="mr-auto text-label text-ink">Decline? You can't change this later.</p>
+            <p className="mr-auto text-label text-ink">{t('donor.requests.declineConfirm')}</p>
             <Button variant="text" size="sm" onClick={() => setConfirmDecline(false)} disabled={respond.isPending}>
-              Keep
+              {t('donor.requests.keep')}
             </Button>
             <Button variant="outline" size="sm" loading={respond.isPending} onClick={() => reply('DECLINED')}>
-              Yes, decline
+              {t('donor.requests.yesDecline')}
             </Button>
           </>
         ) : (
           <>
             <Button variant="outline" onClick={() => setConfirmDecline(true)} disabled={respond.isPending}>
-              Decline
+              {t('donor.requests.decline')}
             </Button>
             <Button
               loading={respond.isPending}
@@ -219,7 +228,7 @@ function RequestCard({ request, me }: { request: IncomingRequest; me: DonorProfi
               onClick={() => reply('ACCEPTED')}
               leftIcon={<Check size={16} className="stroke-2" aria-hidden="true" />}
             >
-              I can donate
+              {t('donor.requests.canDonate')}
             </Button>
           </>
         )}
@@ -242,13 +251,14 @@ function Detail({ icon, label, children }: { icon: ReactNode; label: string; chi
 
 // D8, D9: where to go and when, with "I can't make it anymore"
 function AcceptedBanner({ request, me }: { request: IncomingRequest; me: DonorProfile }) {
+  const { t } = useTranslation();
   const withdraw = useWithdraw();
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
   const firstName = me.fullName.split(' ')[0];
 
   const cantMakeIt = () =>
     withdraw.mutate(request.requestId, {
-      onSuccess: () => toast.success("Thanks for letting them know. The hospital can see you can't make it."),
+      onSuccess: () => toast.success(t('donor.requests.withdrawnToast')),
       onError: (error) => toast.error(error.message),
     });
 
@@ -264,11 +274,14 @@ function AcceptedBanner({ request, me }: { request: IncomingRequest; me: DonorPr
         </span>
         <div className="flex flex-col gap-1">
           <h2 id={`${request.reference}-accepted`} className="font-display text-display-sm">
-            Thank you, {firstName}. {request.hospitalName} is expecting you.
+            {t('donor.requests.thankYou', { name: firstName, hospital: request.hospitalName })}
           </h2>
           <p className="text-body text-on-success-muted">
-            Please arrive before {formatInstant(request.neededBy, true)} and bring your NIC. They need{' '}
-            {units(request)} for request #{request.reference}.
+            {t('donor.requests.arrive', {
+              date: formatInstant(request.neededBy, true),
+              units: units(t, request),
+              ref: request.reference,
+            })}
           </p>
           <p className="text-label text-on-success-muted">
             {request.hospitalAddress}, {request.city}
@@ -284,29 +297,29 @@ function AcceptedBanner({ request, me }: { request: IncomingRequest; me: DonorPr
           className="inline-flex h-10 items-center gap-2 rounded-lg bg-ink px-4 text-label font-semibold text-white no-underline hover:bg-ink-2 focus-visible:shadow-focus focus-visible:outline-none"
         >
           <Navigation size={16} aria-hidden="true" />
-          Directions
+          {t('donor.requests.directions')}
         </a>
         <a
           href={`tel:${request.hospitalPhone}`}
           className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/60 px-4 text-label font-semibold text-white no-underline hover:bg-white/10 focus-visible:shadow-focus focus-visible:outline-none"
         >
           <Phone size={16} aria-hidden="true" />
-          Call blood bank
+          {t('donor.requests.callBloodBank')}
         </a>
 
         {confirmWithdraw ? (
           <span className="flex flex-wrap items-center gap-2 text-label">
-            Tell the hospital you can't come?
+            {t('donor.requests.withdrawConfirm')}
             <button
               type="button"
               className="hit-target relative font-semibold underline disabled:opacity-60"
               disabled={withdraw.isPending}
               onClick={cantMakeIt}
             >
-              {withdraw.isPending ? 'Sending…' : "Yes, I can't make it"}
+              {withdraw.isPending ? t('donor.requests.sending') : t('donor.requests.yesCantMakeIt')}
             </button>
             <button type="button" className="hit-target relative text-on-success-muted underline" onClick={() => setConfirmWithdraw(false)}>
-              Keep my place
+              {t('donor.requests.keepPlace')}
             </button>
           </span>
         ) : (
@@ -315,7 +328,7 @@ function AcceptedBanner({ request, me }: { request: IncomingRequest; me: DonorPr
             className="hit-target relative ml-auto text-label font-semibold text-white underline underline-offset-2"
             onClick={() => setConfirmWithdraw(true)}
           >
-            I can't make it anymore
+            {t('donor.requests.cantMakeIt')}
           </button>
         )}
       </div>

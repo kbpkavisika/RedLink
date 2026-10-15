@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
 import * as authApi from '../api/auth';
@@ -10,6 +11,7 @@ import { AuthLayout } from '../components/layout/AuthLayout';
 import { BloodGroupPicker, Button, FormAlert, Input, PasswordInput } from '../components/ui';
 import { CITIES } from '../lib/cities';
 import { applyFieldErrors } from '../lib/formErrors';
+import { msg } from '../lib/messages';
 import {
   ageOn,
   cityField,
@@ -29,14 +31,14 @@ const schema = z.object({
   fullName: fullNameField,
   email: emailField,
   phone: phoneField,
-  bloodGroup: z.enum(BLOOD_GROUPS, { error: 'Choose your blood group' }),
+  bloodGroup: z.enum(BLOOD_GROUPS, { error: msg('chooseBloodGroup') }),
   dateOfBirth: z
     .string()
-    .min(1, 'Enter your date of birth')
+    .min(1, msg('enterDateOfBirth'))
     .refine((date) => {
       const age = ageOn(date);
       return age >= MIN_AGE && age <= MAX_AGE;
-    }, `Donors must be ${MIN_AGE} to ${MAX_AGE} years old`),
+    }, msg('donorAge')),
   city: cityField,
   password: newPasswordField,
 });
@@ -51,6 +53,7 @@ const FIELDS = ['fullName', 'email', 'phone', 'bloodGroup', 'dateOfBirth', 'city
  * signs them in; RedirectIfAuthenticated then sends them to /donor.
  */
 export function RegisterDonorPage() {
+  const { t } = useTranslation();
   const { startSession } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -68,7 +71,7 @@ export function RegisterDonorPage() {
     setFormError(null);
     try {
       const response = await authApi.registerDonor(values);
-      toast.success(`Welcome to RedLink, ${response.user.fullName.split(' ')[0]}!`);
+      toast.success(t('auth.registerDonor.welcome', { name: response.user.fullName.split(' ')[0] }));
       startSession(response, false);
     } catch (error) {
       const apiError = error as ApiError;
@@ -82,49 +85,53 @@ export function RegisterDonorPage() {
   return (
     <AuthLayout>
       <div className="flex flex-col gap-2">
-        <h1 className="font-display text-display-md text-ink">Become a donor</h1>
-        <p className="text-body text-text-muted">
-          We'll alert you when a hospital nearby needs your blood group. You can pause alerts at any time.
-        </p>
+        <h1 className="font-display text-display-md text-ink">{t('auth.registerDonor.title')}</h1>
+        <p className="text-body text-text-muted">{t('auth.registerDonor.subtitle')}</p>
       </div>
 
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
         <FormAlert>{formError}</FormAlert>
 
-        <Input label="Full name" autoComplete="name" autoFocus error={errors.fullName?.message} {...register('fullName')} />
-        <Input label="Email" type="email" autoComplete="email" error={errors.email?.message} {...register('email')} />
         <Input
-          label="Mobile number"
+          label={t('common.fullName')}
+          autoComplete="name"
+          autoFocus
+          error={errors.fullName?.message}
+          {...register('fullName')}
+        />
+        <Input label={t('common.email')} type="email" autoComplete="email" error={errors.email?.message} {...register('email')} />
+        <Input
+          label={t('common.mobileNumber')}
           type="tel"
           inputMode="tel"
           autoComplete="tel"
           placeholder="0771234567"
-          hint="Hospitals use it to reach you when you accept a request"
+          hint={t('auth.registerDonor.phoneHint')}
           error={errors.phone?.message}
           {...register('phone')}
         />
 
         <BloodGroupPicker
-          legend="Blood group"
-          hint="On your donor card or blood test report"
+          legend={t('common.bloodGroup')}
+          hint={t('auth.registerDonor.bloodGroupHint')}
           error={errors.bloodGroup?.message}
           registration={register('bloodGroup')}
         />
 
         <Input
-          label="Date of birth"
+          label={t('common.dateOfBirth')}
           type="date"
           max={toIsoDate(new Date())}
-          hint={`Donors must be ${MIN_AGE} to ${MAX_AGE} years old`}
+          hint={t('auth.registerDonor.ageHint')}
           error={errors.dateOfBirth?.message}
           {...register('dateOfBirth')}
         />
 
         <Input
-          label="City"
+          label={t('common.city')}
           list="city-suggestions"
           autoComplete="address-level2"
-          hint="Requests in your city are shown first"
+          hint={t('auth.registerDonor.cityHint')}
           error={errors.city?.message}
           {...register('city')}
         />
@@ -135,20 +142,20 @@ export function RegisterDonorPage() {
         </datalist>
 
         <PasswordInput
-          label="Password"
+          label={t('common.password')}
           autoComplete="new-password"
-          hint="8 to 72 characters"
+          hint={t('common.passwordHint')}
           error={errors.password?.message}
           {...register('password')}
         />
 
         <Button type="submit" size="lg" fullWidth loading={isSubmitting}>
-          Create donor account
+          {t('auth.registerDonor.submit')}
         </Button>
       </form>
 
       <p className="text-center text-body text-text-muted">
-        Already have an account? <Link to="/login">Sign in</Link>
+        <Trans i18nKey="auth.registerDonor.haveAccount" components={{ link: <Link to="/login" /> }} />
       </p>
     </AuthLayout>
   );
