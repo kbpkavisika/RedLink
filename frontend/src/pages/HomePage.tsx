@@ -18,6 +18,7 @@ import {
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
+import { ChatWidget } from '../components/chat/ChatWidget';
 import { NotificationBell } from '../components/layout/NotificationBell';
 import { UserMenu } from '../components/layout/UserMenu';
 import { LinkButton } from '../components/ui';
@@ -29,7 +30,8 @@ import { BLOOD_GROUPS, type BloodGroup } from '../types';
 /**
  * "/": the public home page. Everyone sees it, signed in or not; only the buttons change.
  *   signed out → Sign in · Become a donor · Register a hospital
- *   signed in  → Dashboard (their role's home), in the hero, the closing band and the profile menu
+ *   signed in  → Dashboard (their role's home), in the hero, the closing band and the profile menu,
+ *                plus the AI assistant's chat button
  * The dashboards themselves stay behind RequireAuth.
  */
 export function HomePage() {
@@ -46,6 +48,8 @@ export function HomePage() {
         <ClosingBand />
       </main>
       <SiteFooter />
+      {/* Signed-in users only; renders nothing for visitors */}
+      <ChatWidget />
     </div>
   );
 }

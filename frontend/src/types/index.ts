@@ -353,3 +353,16 @@ export interface NotificationItem {
   requestId: number | null; // the request it's about; null for e.g. a hospital decision
   reference: string | null; // "RQ-12"
 }
+
+// ---- AI assistant (backend: dto/chat) ----
+
+// One message of the conversation; the browser keeps the history and sends it with each question
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+// POST /api/chat
+export interface ChatReply {
+  reply: string;
+}
