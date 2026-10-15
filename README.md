@@ -173,6 +173,22 @@ In-app only: a bell in the top bar with the unread count (checked every 30 secon
 
 Declines aren't reported. Opening a notification marks it read and goes to what it's about: staff to the request page, donors to their requests page (scrolled to it), and anything else, such as a hospital decision, to the dashboard.
 
+### AI assistant
+
+Every page in the app, and the home page while signed in, has a chat button in the bottom-right corner. The assistant answers questions about blood donation and how to use RedLink, in English, Sinhala or Tamil. It's answered by [Groq](https://console.groq.com), which has a free tier, using `openai/gpt-oss-120b` with `reasoning-effort=low` by default. Free-tier keys can't use Groq's Llama models; `GET https://api.groq.com/openai/v1/models` with your key lists the ones it can use.
+
+```
+ChatWidget (React) ──► POST /api/chat (signed in) ──► ChatService ──► GroqClient ──► Groq API
+                       per-account limit, checks       system prompt + role
+```
+
+- **The key never reaches the browser.** Only the backend calls Groq, with `redlink.ai.groq.api-key`.
+- **Nothing is stored.** The browser keeps the conversation (in `sessionStorage`, gone when the tab closes) and sends it with each question; the backend uses the latest 12 messages.
+- **No personal data goes to Groq:** only the conversation and the user's role (donor, staff or admin), so the assistant can point to the right pages. Never names, emails, phone numbers or anything from the database.
+- **Stays on topic.** The system prompt in `ChatService` describes how RedLink works and tells the model not to diagnose, to send emergencies to 1990 (Suwa Seriya) or a hospital, and never to ask for passwords. The chat shows "AI answers can be wrong. Not medical advice."
+- **Limits protect the free quota:** 20 messages per account every 10 minutes (`redlink.rate-limit.chat-per-user`), questions up to 1,000 characters, replies up to 600 tokens. Over the limit the API answers **429** with `Retry-After`.
+- **Optional.** Without a key the app runs normally and `/api/chat` answers **503** "The assistant isn't available right now". Groq's own rate limit, a timeout or a bad key are also **503**, with details only in the server log.
+
 ### Matching engine
 
 For a request with blood group **R** in city **C**, a donor is a match when **all** of the following are true:
@@ -357,8 +373,10 @@ Authorization: Bearer <token>
 | `redlink.jwt.expiry`, `redlink.jwt.remember-me-expiry` | `application.properties` | `12h`, `7d` |
 | `redlink.admin.email`, `redlink.admin.password` | `application-local.properties` / `REDLINK_ADMIN_EMAIL`, `REDLINK_ADMIN_PASSWORD` | Optional; creates the first admin once |
 | `redlink.cors.allowed-origins` | `REDLINK_CORS_ALLOWED_ORIGINS` when deployed | e.g. the Vercel URL |
-| `redlink.rate-limit.*` | `application.properties` | Sign-in and registration limits; `enabled=false` switches them off |
+| `redlink.rate-limit.*` | `application.properties` | Sign-in, registration and AI assistant limits; `enabled=false` switches them off |
 | `redlink.rate-limit.client-ip-header` | `REDLINK_RATE_LIMIT_CLIENT_IP_HEADER` when deployed | The header the host puts the visitor's address in. Empty = the connecting address |
+| `redlink.ai.groq.api-key` | `application-local.properties` / `REDLINK_AI_GROQ_API_KEY` | Optional; switches the [AI assistant](#ai-assistant) on |
+| `redlink.ai.groq.*` | `application.properties` | Model, reply length, timeout, history and question length for the assistant |
 
 During development, Vite proxies every `/api/*` request from port 5173 to the backend on port 8080, so no CORS configuration is needed.
 
@@ -765,6 +783,9 @@ redlink.admin.password=CHOOSE_8_TO_72_CHARACTERS
 # Optional, this machine only: sample hospitals and donors for testing by hand (see "Sample data" below)
 redlink.seed.enabled=true
 redlink.seed.password=CHOOSE_8_TO_72_CHARACTERS
+
+# Optional: switches the AI assistant on. Free key from console.groq.com → API Keys
+redlink.ai.groq.api-key=gsk_PASTE_YOUR_KEY_HERE
 ```
 
 Generate a secret with either of these:
@@ -897,6 +918,7 @@ Start the backend first (step 4). All endpoints are under `http://localhost:8080
 | `PATCH` | `/api/notifications/{id}/read` | Signed in | Mark one read. Someone else's is `404` |
 | `PATCH` | `/api/notifications/read-all` | Signed in | Mark all of your own read; returns `{"updated": n}` |
 | `GET` | `/api/donor/donations` | Donor | `totalDonations`, `totalUnits`, `livesHelped`, `nextEligibleDate`, and every donation newest first (hospital, date, `#RQ-…`, units) |
+| `POST` | `/api/chat` | Signed in | Ask the [AI assistant](#ai-assistant): `{"messages":[{"role":"user","content":"…"}]}` (oldest first, ending with the question) → `{"reply":"…"}`. `429` over the limit, `503` when it's off or Groq is unavailable |
 
 Everything except register and login needs the header `Authorization: Bearer <token>`.
 
@@ -1172,6 +1194,7 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Requests expire automatically after their needed-by time (background job)
 - [x] Hospital dashboard and requests table; admin view of every request (read-only)
 - [x] Frontend tests (Vitest + Testing Library): helpers, route guards, sign-in, screen states; run in CI
+- [x] AI assistant (Groq): questions about blood donation and using RedLink, in English, Sinhala or Tamil
 - [x] GitHub Actions CI (backend tests + frontend lint/build on every pull request)
 - [x] Branch protection on `main` (pull request + passing CI required)
 - [ ] Dockerize the backend
