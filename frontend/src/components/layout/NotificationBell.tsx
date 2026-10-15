@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
 import { useMarkAllRead, useMarkRead, useNotifications } from '../../hooks/useNotifications';
@@ -15,6 +16,7 @@ const PREVIEW = 8;
  * Opening a notification marks it read and goes to what it's about (see notificationLink).
  */
 export function NotificationBell() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { data } = useNotifications(!user?.mustChangePassword);
@@ -59,7 +61,7 @@ export function NotificationBell() {
         aria-haspopup="true"
         aria-expanded={open}
         aria-controls={panelId}
-        aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+        aria-label={unread > 0 ? t('notifications.bellLabelUnread', { count: unread }) : t('notifications.bellLabel')}
         onClick={() => setOpen((value) => !value)}
         className="relative flex size-10 items-center justify-center rounded-md text-text-muted hover:bg-bg hover:text-ink focus-visible:shadow-focus focus-visible:outline-none"
       >
@@ -81,7 +83,10 @@ export function NotificationBell() {
         >
           <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
             <p className="text-body font-semibold text-ink">
-              Notifications{unread > 0 && <span className="font-normal text-text-subtle"> · {unread} unread</span>}
+              {t('notifications.title')}
+              {unread > 0 && (
+                <span className="font-normal text-text-subtle"> · {t('notifications.unreadCount', { count: unread })}</span>
+              )}
             </p>
             {unread > 0 && (
               <button
@@ -90,14 +95,14 @@ export function NotificationBell() {
                 className="hit-target relative inline-flex items-center gap-1 text-label font-semibold text-primary hover:text-primary-hover"
               >
                 <CheckCheck size={14} aria-hidden="true" />
-                Mark all as read
+                {t('notifications.markAllRead')}
               </button>
             )}
           </div>
 
           {items.length === 0 ? (
             <p className="px-4 py-8 text-center text-label text-text-subtle">
-              {data ? "You're all caught up. New notifications appear here." : 'Loading…'}
+              {data ? t('notifications.allCaughtUp') : t('common.loading')}
             </p>
           ) : (
             <ul className="max-h-[420px] divide-y divide-neutral-soft overflow-y-auto">
@@ -117,7 +122,7 @@ export function NotificationBell() {
                     />
                     <span className="flex min-w-0 flex-col gap-0.5">
                       <span className={clsx('text-label', item.read ? 'text-text-muted' : 'font-medium text-ink')}>
-                        {!item.read && <span className="sr-only">Unread: </span>}
+                        {!item.read && <span className="sr-only">{t('notifications.unreadPrefix')}</span>}
                         {item.message}
                       </span>
                       <span className="text-caption text-text-subtle">{timeAgo(item.createdAt)}</span>
@@ -133,7 +138,7 @@ export function NotificationBell() {
             onClick={() => setOpen(false)}
             className="border-t border-border px-4 py-3 text-center text-label font-semibold text-primary no-underline hover:bg-bg hover:text-primary-hover"
           >
-            See all notifications
+            {t('notifications.seeAll')}
           </Link>
         </div>
       )}

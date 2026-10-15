@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 
 interface EligibilityRingProps {
   // null = never donated (counts as a full ring)
@@ -18,6 +19,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
  * The ring is decorative: the card next to it says the same thing in words.
  */
 export function EligibilityRing({ daysSinceLastDonation, daysBetweenDonations, eligible }: EligibilityRingProps) {
+  const { t } = useTranslation();
   const days = daysSinceLastDonation ?? daysBetweenDonations;
   const progress = Math.min(days, daysBetweenDonations) / daysBetweenDonations;
 
@@ -41,7 +43,7 @@ export function EligibilityRing({ daysSinceLastDonation, daysBetweenDonations, e
         <span className="font-mono text-label font-medium text-ink">
           {daysSinceLastDonation === null ? '—' : Math.min(daysSinceLastDonation, 999)}
         </span>
-        <span className="text-caption leading-none text-text-subtle">days</span>
+        <span className="text-caption leading-none text-text-subtle">{t('ui.days')}</span>
       </span>
     </div>
   );

@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { Menu, X } from 'lucide-react';
 import { Suspense, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
 import { Button, Panel, StateView } from '../ui';
@@ -8,6 +9,7 @@ import { navigation, pageTitleFor } from './navigation';
 import { homePathFor } from '../../lib/roles';
 import { ChatWidget } from '../chat/ChatWidget';
 import { BackButton } from './BackButton';
+import { LanguageSwitcher } from './LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
 import { UserMenu } from './UserMenu';
 
@@ -17,6 +19,7 @@ import { UserMenu } from './UserMenu';
  * Below 1024px the sidebar becomes a slide-out menu.
  */
 export function AppShell() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -33,7 +36,8 @@ export function AppShell() {
 
   if (!user) return null; // RequireAuth guarantees a user; this keeps TypeScript happy
 
-  const title = pageTitleFor(pathname, user.role);
+  const titleKey = pageTitleFor(pathname, user.role);
+  const title = titleKey ? t(`nav.${titleKey}`) : 'RedLink';
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
@@ -42,7 +46,7 @@ export function AppShell() {
         href="#main-content"
         className="sr-only z-50 rounded-md bg-ink px-4 py-2 text-label font-semibold text-white focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
       >
-        Skip to main content
+        {t('nav.skipToContent')}
       </a>
       {/* Dimmed backdrop behind the mobile menu */}
       {menuOpen && (
@@ -58,15 +62,15 @@ export function AppShell() {
         )}
       >
         <div className="flex h-16 items-center justify-between px-5">
-          <Link to="/" aria-label="RedLink home" onClick={() => setMenuOpen(false)}>
+          <Link to="/" aria-label={t('common.homeLink')} onClick={() => setMenuOpen(false)}>
             <img src="/brand/redlink-logo.svg" alt="RedLink" className="h-7" />
           </Link>
-          <Button variant="icon" aria-label="Close menu" className="lg:hidden" onClick={() => setMenuOpen(false)}>
+          <Button variant="icon" aria-label={t('nav.closeMenu')} className="lg:hidden" onClick={() => setMenuOpen(false)}>
             <X size={18} aria-hidden="true" />
           </Button>
         </div>
 
-        <nav aria-label="Main" className="flex flex-col gap-1 px-3 py-2">
+        <nav aria-label={t('nav.main')} className="flex flex-col gap-1 px-3 py-2">
           {navigation[user.role].map(({ label, path, icon: Icon, end }) => (
             <NavLink
               key={path}
@@ -84,7 +88,7 @@ export function AppShell() {
               }
             >
               <Icon size={18} aria-hidden="true" />
-              {label}
+              {t(`nav.${label}`)}
             </NavLink>
           ))}
         </nav>
@@ -94,7 +98,7 @@ export function AppShell() {
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-surface px-4 sm:px-8">
           <Button
             variant="icon"
-            aria-label="Open menu"
+            aria-label={t('nav.openMenu')}
             aria-controls="app-sidebar"
             aria-expanded={menuOpen}
             className="lg:hidden"
@@ -109,6 +113,7 @@ export function AppShell() {
           <h1 className="min-w-0 flex-1 truncate text-title-md text-ink">{title}</h1>
 
 
+          <LanguageSwitcher />
           <NotificationBell />
           <UserMenu />
         </header>

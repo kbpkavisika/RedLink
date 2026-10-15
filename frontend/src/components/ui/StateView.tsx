@@ -1,6 +1,8 @@
 import clsx from 'clsx';
 import { Check, Droplet, Lock, RefreshCw, SearchX, TriangleAlert, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { Translation } from '../../locales/en';
 import type { ApiError } from '../../types';
 import { Button } from './Button';
 import { SkeletonRows } from './Skeleton';
@@ -26,12 +28,12 @@ interface StateViewProps {
   children?: ReactNode;
 }
 
-const defaults: Record<Exclude<ScreenState, 'loading'>, { icon: LucideIcon; title: string }> = {
-  empty: { icon: Droplet, title: 'Nothing here yet' },
-  'no-results': { icon: SearchX, title: 'No results match these filters' },
-  error: { icon: TriangleAlert, title: "We couldn't load this" },
-  success: { icon: Check, title: 'Done' },
-  blocked: { icon: Lock, title: "This isn't available yet" },
+const defaults: Record<Exclude<ScreenState, 'loading'>, { icon: LucideIcon; title: keyof Translation['ui'] }> = {
+  empty: { icon: Droplet, title: 'stateEmpty' },
+  'no-results': { icon: SearchX, title: 'stateNoResults' },
+  error: { icon: TriangleAlert, title: 'stateError' },
+  success: { icon: Check, title: 'stateSuccess' },
+  blocked: { icon: Lock, title: 'stateBlocked' },
 };
 
 const tiles = {
@@ -58,23 +60,25 @@ export function StateView({
   rows,
   children,
 }: StateViewProps) {
+  const { t } = useTranslation();
+
   if (state === 'loading') {
     return (
       <div aria-busy="true">
-        <span className="sr-only">Loading…</span>
+        <span className="sr-only">{t('common.loading')}</span>
         <SkeletonRows rows={rows} />
       </div>
     );
   }
 
   const Icon = icon ?? defaults[state].icon;
-  const heading = title ?? defaults[state].title;
+  const heading = title ?? t(`ui.${defaults[state].title}`);
   const body = description ?? (state === 'error' ? error?.message : undefined);
   const mainAction =
     action ??
     (state === 'error' && onRetry ? (
       <Button onClick={onRetry} leftIcon={<RefreshCw size={16} className="stroke-2" aria-hidden="true" />}>
-        Try again
+        {t('common.tryAgain')}
       </Button>
     ) : undefined);
 
@@ -117,7 +121,7 @@ export function StateView({
 
       {state === 'error' && error?.ref && (
         <p className="font-mono text-mono-sm text-text-subtle">
-          Error {error.status || '—'} · ref {error.ref}
+          {t('ui.errorRef', { status: error.status || '—', ref: error.ref })}
         </p>
       )}
     </div>

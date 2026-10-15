@@ -1,30 +1,31 @@
 import { ShieldCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { BackButton } from './BackButton';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 /**
  * Sign-in and registration (design.md §6.1): a 640px dark hero on the left and the form column on the right.
  * Below 1024px the hero is hidden and a slim logo header sits above the form instead.
  */
 export function AuthLayout({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   return (
     <div className="grid min-h-screen bg-surface lg:grid-cols-[640px_1fr]">
       <aside className="relative hidden overflow-hidden bg-ink p-14 text-white lg:flex lg:flex-col lg:justify-between">
-        <Link to="/" aria-label="RedLink home" className="relative self-start">
+        <Link to="/" aria-label={t('common.homeLink')} className="relative self-start">
           <img src="/brand/redlink-logo-reversed.svg" alt="RedLink" className="h-8" />
         </Link>
 
         <div className="relative flex max-w-[440px] flex-col gap-4">
-          <h2 className="font-display text-display-xl">Stop calling donors one by one.</h2>
-          <p className="text-body-lg text-on-dark-muted">
-            Post a request and RedLink ranks every compatible, eligible donor nearby — then notifies them for you.
-          </p>
+          <h2 className="font-display text-display-xl">{t('auth.heroTitle')}</h2>
+          <p className="text-body-lg text-on-dark-muted">{t('auth.heroBody')}</p>
         </div>
 
         <p className="relative flex items-center gap-2 text-label text-on-dark-muted">
           <ShieldCheck size={18} strokeWidth={1.75} className="text-primary-on-dark" aria-hidden="true" />
-          Patient details never leave the hospital
+          {t('auth.heroTrust')}
         </p>
 
         {/* Large blood drop bleeding off the bottom-right corner */}
@@ -41,9 +42,10 @@ export function AuthLayout({ children }: { children: ReactNode }) {
         <div className="flex w-full max-w-[400px] flex-col gap-8">
           <div className="-mb-4 flex items-center gap-2">
             <BackButton fallback="/" className="-ml-2.5" />
-            <Link to="/" aria-label="RedLink home" className="lg:hidden">
+            <Link to="/" aria-label={t('common.homeLink')} className="lg:hidden">
               <img src="/brand/redlink-logo.svg" alt="RedLink" className="h-8" />
             </Link>
+            <LanguageSwitcher className="ml-auto" />
           </div>
           {children}
         </div>

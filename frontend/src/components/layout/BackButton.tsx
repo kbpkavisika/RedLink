@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import { ArrowLeft } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 interface BackButtonProps {
@@ -15,6 +16,7 @@ interface BackButtonProps {
  * When this tab has no earlier RedLink page, it goes to `fallback` instead of leaving the site.
  */
 export function BackButton({ fallback, onDark = false, className }: BackButtonProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   // React Router gives the first page of a tab the key "default"
@@ -23,8 +25,8 @@ export function BackButton({ fallback, onDark = false, className }: BackButtonPr
   return (
     <button
       type="button"
-      aria-label="Go back"
-      title="Go back"
+      aria-label={t('common.goBack')}
+      title={t('common.goBack')}
       onClick={() => (hasHistory ? navigate(-1) : navigate(fallback))}
       className={clsx(
         'flex size-10 shrink-0 items-center justify-center rounded-md focus-visible:shadow-focus focus-visible:outline-none',

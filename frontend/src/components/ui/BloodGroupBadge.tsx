@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { formatBloodGroup } from '../../lib/format';
 import type { BloodGroup } from '../../types';
 
@@ -14,6 +15,7 @@ interface BloodGroupBadgeProps {
 }
 
 export function BloodGroupBadge({ group, size = 'sm' }: BloodGroupBadgeProps) {
+  const { t } = useTranslation();
   return (
     <span
       className={clsx(
@@ -21,7 +23,7 @@ export function BloodGroupBadge({ group, size = 'sm' }: BloodGroupBadgeProps) {
         sizes[size],
       )}
     >
-      <span className="sr-only">Blood group </span>
+      <span className="sr-only">{t('common.bloodGroup')} </span>
       {formatBloodGroup(group)}
     </span>
   );

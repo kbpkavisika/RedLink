@@ -1,9 +1,10 @@
 import clsx from 'clsx';
 import { ChevronDown, KeyRound, LayoutDashboard, LogOut } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
-import { homePathFor, roleLabel } from '../../lib/roles';
+import { homePathFor } from '../../lib/roles';
 
 function initials(name: string): string {
   return name
@@ -18,6 +19,7 @@ const itemClass =
   'flex h-10 w-full items-center gap-2.5 rounded-md px-3 text-body font-medium text-ink no-underline hover:bg-bg hover:text-ink focus-visible:shadow-focus focus-visible:outline-none';
 
 export function UserMenu() {
+  const { t } = useTranslation();
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const menuId = useId();
@@ -67,20 +69,20 @@ export function UserMenu() {
           <div className="border-b border-border px-3 pt-2 pb-3">
             <p className="text-body font-semibold text-ink">{user.fullName}</p>
             <p className="truncate text-caption text-text-subtle">{user.email}</p>
-            <p className="mt-1 text-caption text-text-subtle">{roleLabel(user.role)}</p>
+            <p className="mt-1 text-caption text-text-subtle">{t(`status.role.${user.role}`)}</p>
           </div>
           <div className="pt-1.5">
             <Link to={homePathFor(user.role)} className={itemClass} onClick={() => setOpen(false)}>
               <LayoutDashboard size={16} aria-hidden="true" />
-              Dashboard
+              {t('common.dashboard')}
             </Link>
             <Link to="/change-password" className={itemClass} onClick={() => setOpen(false)}>
               <KeyRound size={16} aria-hidden="true" />
-              Change password
+              {t('common.changePassword')}
             </Link>
             <button type="button" className={itemClass} onClick={logout}>
               <LogOut size={16} aria-hidden="true" />
-              Sign out
+              {t('common.signOut')}
             </button>
           </div>
         </div>

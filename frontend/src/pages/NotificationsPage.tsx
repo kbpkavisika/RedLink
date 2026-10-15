@@ -1,10 +1,12 @@
 import clsx from 'clsx';
 import { BellOff, CheckCheck, ChevronRight, RefreshCw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { Button, FilterBar, FilterSelect, Panel, SearchInput, StateView } from '../components/ui';
 import { useMarkAllRead, useMarkRead, useNotifications } from '../hooks/useNotifications';
 import { useUrlFilters } from '../hooks/useUrlFilters';
+import { currentLanguage } from '../i18n';
 import { formatInstant } from '../lib/format';
 import { matchesQuery } from '../lib/search';
 import { notificationLink, timeAgo } from '../lib/notifications';
@@ -17,6 +19,7 @@ const FILTERS = ['q', 'status'] as const;
  * Opening one marks it read and goes to what it's about, as in the bell.
  */
 export function NotificationsPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { data, isPending, isError, error, refetch, isRefetching } = useNotifications();
@@ -42,7 +45,7 @@ export function NotificationsPage() {
   return (
     <div className="mx-auto w-full max-w-[880px]">
       <Panel
-        title="Notifications"
+        title={t('notifications.title')}
         actions={
           data &&
           data.unreadCount > 0 && (
@@ -52,7 +55,7 @@ export function NotificationsPage() {
               onClick={() => markAllRead.mutate()}
               leftIcon={<CheckCheck size={16} aria-hidden="true" />}
             >
-              Mark all as read ({data.unreadCount})
+              {t('notifications.markAllReadCount', { count: data.unreadCount })}
             </Button>
           )
         }
@@ -60,19 +63,19 @@ export function NotificationsPage() {
         {items.length > 0 && (
           <FilterBar shown={rows.length} total={items.length} active={filters.active} onClear={filters.clear}>
             <SearchInput
-              label="Search notifications"
-              placeholder="Words or RQ number"
+              label={t('notifications.search')}
+              placeholder={t('notifications.searchPlaceholder')}
               value={q}
               onChange={(value) => filters.set('q', value)}
             />
             <FilterSelect
-              label="Read or unread"
-              allLabel="All"
+              label={t('notifications.readFilter')}
+              allLabel={t('common.all')}
               value={status}
               onChange={(value) => filters.set('status', value)}
               options={[
-                { value: 'unread', label: 'Unread' },
-                { value: 'read', label: 'Read' },
+                { value: 'unread', label: t('notifications.unread') },
+                { value: 'read', label: t('notifications.read') },
               ]}
             />
           </FilterBar>
@@ -83,7 +86,7 @@ export function NotificationsPage() {
         ) : isError ? (
           <StateView
             state="error"
-            title="We couldn't load your notifications"
+            title={t('notifications.loadError')}
             error={error}
             action={
               <Button
@@ -91,7 +94,7 @@ export function NotificationsPage() {
                 onClick={() => void refetch()}
                 leftIcon={<RefreshCw size={16} className="stroke-2" aria-hidden="true" />}
               >
-                Try again
+                {t('common.tryAgain')}
               </Button>
             }
           />
@@ -99,17 +102,17 @@ export function NotificationsPage() {
           <StateView
             state="empty"
             icon={BellOff}
-            title="No notifications yet"
-            description="Requests, replies and decisions that concern you appear here."
+            title={t('notifications.emptyTitle')}
+            description={t('notifications.emptyBody')}
           />
         ) : rows.length === 0 ? (
           <StateView
             state="no-results"
-            title={status === 'unread' ? 'No unread notifications match' : 'No notifications match'}
-            description="Try other words, or clear the filters to see them all."
+            title={status === 'unread' ? t('notifications.noUnreadMatch') : t('notifications.noneMatch')}
+            description={t('notifications.noMatchBody')}
             action={
               <Button variant="outline" onClick={filters.clear}>
-                Clear filters
+                {t('common.clearFilters')}
               </Button>
             }
           />
@@ -131,7 +134,7 @@ export function NotificationsPage() {
                   />
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className={clsx('text-body', item.read ? 'text-text-muted' : 'font-medium text-ink')}>
-                      {!item.read && <span className="sr-only">Unread: </span>}
+                      {!item.read && <span className="sr-only">{t('notifications.unreadPrefix')}</span>}
                       {item.message}
                     </span>
                     <span className="text-caption text-text-subtle" title={formatInstant(item.createdAt, true)}>
@@ -146,6 +149,10 @@ export function NotificationsPage() {
           </ul>
         )}
       </Panel>
+      {/* The server writes notifications in English for now (README "Languages") */}
+      {currentLanguage() !== 'en' && items.length > 0 && (
+        <p className="mt-3 text-center text-caption text-text-subtle">{t('notifications.serverTextNote')}</p>
+      )}
     </div>
   );
 }
