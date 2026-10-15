@@ -1,5 +1,7 @@
 import clsx from 'clsx';
 import { useId, type ComponentProps } from 'react';
+import { useTranslation } from 'react-i18next';
+import { translateMessage } from '../../lib/messages';
 
 interface TextareaProps extends ComponentProps<'textarea'> {
   label: string;
@@ -12,7 +14,8 @@ export function Textarea({ label, error, hint, id, className, rows = 4, ...rest 
   const generatedId = useId();
   const textareaId = id ?? generatedId;
   const messageId = `${textareaId}-message`;
-  const message = error ?? hint;
+  const { t } = useTranslation();
+  const message = translateMessage(t, error) ?? hint;
 
   return (
     <div className={clsx('flex flex-col gap-1.5', className)}>

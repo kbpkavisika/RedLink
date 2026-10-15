@@ -1,5 +1,7 @@
 import clsx from 'clsx';
 import { useId, type ComponentProps, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { translateMessage } from '../../lib/messages';
 
 interface InputProps extends ComponentProps<'input'> {
   label: string;
@@ -17,7 +19,8 @@ export function Input({ label, error, hint, labelAction, rightSlot, id, classNam
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const messageId = `${inputId}-message`;
-  const message = error ?? hint;
+  const { t } = useTranslation();
+  const message = translateMessage(t, error) ?? hint;
 
   return (
     <div className={clsx('flex flex-col gap-1.5', className)}>
