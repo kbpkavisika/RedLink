@@ -936,6 +936,70 @@
           }
         }
       ]
+    },
+    {
+      "name": "10. AI assistant",
+      "description": "Any signed-in role. Needs redlink.ai.groq.api-key on the backend; without it every request here is 503. Each question counts towards the per-account limit (20 every 10 minutes).",
+      "item": [
+        {
+          "name": "Ask a question",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status 200 (503 when the assistant is off)', () => pm.expect(pm.response.code).to.be.oneOf([200, 503]));",
+              "if (pm.response.code === 200) console.log(pm.response.json().reply);"
+            ] } }
+          ],
+          "request": {
+            "description": "The conversation, oldest first, ending with the question. Returns the reply.",
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messages\": [\n    { \"role\": \"user\", \"content\": \"Who can donate blood?\" }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/chat", "host": ["{{baseUrl}}"], "path": ["chat"] }
+          }
+        },
+        {
+          "name": "Follow-up with history",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status 200 (503 when the assistant is off)', () => pm.expect(pm.response.code).to.be.oneOf([200, 503]));"
+            ] } }
+          ],
+          "request": {
+            "description": "Earlier messages give the question its context; the backend uses the latest 12.",
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messages\": [\n    { \"role\": \"user\", \"content\": \"Who can donate blood?\" },\n    { \"role\": \"assistant\", \"content\": \"Most healthy adults aged 18 to 60.\" },\n    { \"role\": \"user\", \"content\": \"How long do I wait between donations?\" }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/chat", "host": ["{{baseUrl}}"], "path": ["chat"] }
+          }
+        },
+        {
+          "name": "Last message not a question (400)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status 400 (503 when the assistant is off)', () => pm.expect(pm.response.code).to.be.oneOf([400, 503]));"
+            ] } }
+          ],
+          "request": {
+            "description": "The conversation must end with the user's question.",
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messages\": [\n    { \"role\": \"user\", \"content\": \"Hi\" },\n    { \"role\": \"assistant\", \"content\": \"Hello!\" }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/chat", "host": ["{{baseUrl}}"], "path": ["chat"] }
+          }
+        }
+      ]
     }
   ]
 }

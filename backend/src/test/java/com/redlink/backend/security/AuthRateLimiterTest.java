@@ -38,6 +38,7 @@ class AuthRateLimiterTest {
                 new Limit(3, Duration.ofMinutes(1)),   // sign-in per address
                 new Limit(5, Duration.ofMinutes(15)),  // sign-in per account
                 new Limit(2, Duration.ofHours(1)),     // registration per address
+                new Limit(2, Duration.ofMinutes(10)),  // AI assistant per account
                 clientIpHeader);
         return new AuthRateLimiter(properties, clock);
     }
@@ -108,6 +109,19 @@ class AuthRateLimiterTest {
                 .hasMessageContaining("sign-ups");
         // Signing in from the same address is unaffected
         assertThatCode(() -> limiter.checkLogin(from("1.1.1.1"), "a@x.lk")).doesNotThrowAnyException();
+    }
+
+    @Test
+    void chatIsLimitedPerAccount() {
+        AuthRateLimiter limiter = limiter(true, "");
+        limiter.checkChat(1L);
+        limiter.checkChat(1L);
+
+        assertThatThrownBy(() -> limiter.checkChat(1L))
+                .isInstanceOf(TooManyRequestsException.class)
+                .hasMessage("Too many messages to the assistant. Please try again in 10 minutes.");
+        // Another account has its own count
+        assertThatCode(() -> limiter.checkChat(2L)).doesNotThrowAnyException();
     }
 
     @Test

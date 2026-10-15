@@ -6,6 +6,7 @@ import { useAuth } from '../../auth/useAuth';
 import { Button, Panel, StateView } from '../ui';
 import { navigation, pageTitleFor } from './navigation';
 import { homePathFor } from '../../lib/roles';
+import { ChatWidget } from '../chat/ChatWidget';
 import { BackButton } from './BackButton';
 import { NotificationBell } from './NotificationBell';
 import { UserMenu } from './UserMenu';
@@ -112,7 +113,7 @@ export function AppShell() {
           <UserMenu />
         </header>
 
-        <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1312px] flex-1 px-4 py-6 focus:outline-none sm:px-8 lg:py-8">
+        <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1312px] flex-1 px-4 pt-6 pb-24 focus:outline-none sm:px-8 lg:pt-8">
           {/* While a page downloads the first time, the sidebar and top bar stay and only this area waits */}
           <Suspense
             fallback={
@@ -125,6 +126,8 @@ export function AppShell() {
           </Suspense>
         </main>
       </div>
+
+      <ChatWidget />
     </div>
   );
 }
