@@ -508,6 +508,29 @@ const rows = data.filter((row) => matchesQuery(q, row.name, row.city) && (!statu
 </Panel>
 ```
 
+### Languages
+
+The whole frontend is in **English, සිංහල (Sinhala) and தமிழ் (Tamil)**, with [i18next](https://www.i18next.com) and react-i18next (free, MIT). A language menu sits in the top bar, the home page header and the sign-in pages.
+
+- **Choosing a language:** the one picked before (saved in `localStorage` as `redlink.language`), else the browser's if it's Sinhala or Tamil, else English. Changing it also sets `<html lang>`, so screen readers pronounce it right.
+- **Text lives in** [`src/locales/`](frontend/src/locales/): `en.ts` is the source; `si.ts` and `ta.ts` have the same keys. They're TypeScript, not JSON, so **a missing or misspelled key fails the build**, in the translation files and in every `t('…')` call. A test also checks that each translation keeps the English `{{placeholders}}` and `<tags>`.
+- **Fonts:** IBM Plex Sans and Bricolage Grotesque have no Sinhala or Tamil letters, so Noto Sans Sinhala and Noto Sans Tamil follow them in the font list. The browser only downloads those when such letters are on screen.
+- **Dates** use the language's own month names (`si-LK`, `ta-LK`); numbers stay as digits.
+- **Form errors:** the zod rules hold keys (`msg('enterEmail')`), and `Input`, `Select`, `Textarea` and `BloodGroupPicker` translate them when shown.
+- **Still English:** messages written by the backend, i.e. API error messages (such as "Email or password is incorrect.") and the text of notifications, which is saved when the notification is created. Translating those needs backend changes (see Roadmap). The AI assistant answers in whatever language the user writes in.
+- **Translations need a native speaker's review**, especially the medical terms.
+
+Using it in a component:
+
+```tsx
+const { t } = useTranslation();
+<h1>{t('auth.login.title')}</h1>
+<p>{t('donor.home.andMore', { count: 3 })}</p>                        // {{count}}, with key_one / key_other for plurals
+<Trans i18nKey="auth.forgot.contact" components={{ link: <a href="mailto:admin@redlink.lk" /> }} />   // <link>…</link> in the text
+```
+
+**Adding text:** add the key to `en.ts`, then to `si.ts` and `ta.ts` (the build tells you if you forget). **Adding a language:** copy `en.ts` to e.g. `fr.ts`, translate it, and add it to `LANGUAGES` and `resources` in [`src/i18n.ts`](frontend/src/i18n.ts).
+
 ---
 
 ## Database Design
@@ -698,10 +721,12 @@ RedLink/
 │   │   ├── dev/                     # Component gallery + test sign-in (development only)
 │   │   ├── hooks/                   # TanStack Query hooks (useDonors, …)
 │   │   ├── lib/                     # Query client, token store, ApiError, formatting, roles
+│   │   ├── locales/                 # en.ts, si.ts, ta.ts: every word on screen (see Languages)
 │   │   ├── pages/                   # Route pages, grouped by role (admin/, hospital/, …)
 │   │   ├── types/index.ts           # TypeScript types matching backend DTOs and enums
 │   │   ├── index.css                # Design tokens (Tailwind @theme) and base styles
 │   │   ├── App.tsx                  # Routes
+│   │   ├── i18n.ts                  # Languages: English, Sinhala, Tamil (i18next)
 │   │   └── main.tsx                 # Entry point and providers
 │   └── vite.config.ts               # Dev server + /api proxy to :8080
 │
@@ -1195,6 +1220,7 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 - [x] Hospital dashboard and requests table; admin view of every request (read-only)
 - [x] Frontend tests (Vitest + Testing Library): helpers, route guards, sign-in, screen states; run in CI
 - [x] AI assistant (Groq): questions about blood donation and using RedLink, in English, Sinhala or Tamil
+- [x] The whole frontend in English, Sinhala and Tamil (i18next), with a language menu
 - [x] GitHub Actions CI (backend tests + frontend lint/build on every pull request)
 - [x] Branch protection on `main` (pull request + passing CI required)
 - [ ] Dockerize the backend
@@ -1202,6 +1228,7 @@ cd ../backend && ./mvnw verify          # Windows: .\mvnw.cmd verify
 
 ### Later (v2)
 
+- [ ] Backend messages in Sinhala and Tamil: API errors by `Accept-Language`, and notifications saved as a type plus details so each reader sees them in their language
 - [ ] Password reset by email (one-time link; Mailtrap in development, Brevo or Resend in production)
 - [ ] Hospital staff invite their own colleagues instead of asking the admin
 - [ ] Notify donors in waves: if too few accept in time, notify the next group
