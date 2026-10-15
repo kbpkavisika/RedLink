@@ -19,9 +19,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Limits how often sign-in and registration can be tried, so nobody can guess passwords at speed
  * or create accounts in bulk. Over a limit → 429 with Retry-After, before any password is checked.
+ * Also limits messages to the AI assistant, so one account can't use up the shared Groq quota.
  *
  *   sign-in:      per address, then per account (email)
  *   registration: per address
+ *   AI assistant: per signed-in account
  *
  * Each key keeps the times of its recent attempts (a sliding window). Kept in memory: right for one
  * backend instance; restarting forgets every count. Several instances would need a shared store (e.g. Redis).
@@ -51,6 +53,10 @@ public class AuthRateLimiter {
 
     public void checkRegistration(HttpServletRequest request) {
         consume("register-ip:" + clientIp(request), properties.registerPerIp(), "sign-ups from your network");
+    }
+
+    public void checkChat(Long userId) {
+        consume("chat-user:" + userId, properties.chatPerUser(), "messages to the assistant");
     }
 
     // The visitor's address: the configured header's first value (set by the host), else the connecting address
