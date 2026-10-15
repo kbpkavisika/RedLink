@@ -1,4 +1,5 @@
 import { Building2, RefreshCw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import {
   Button,
@@ -22,14 +23,6 @@ import { HospitalReviewPanel } from './HospitalReviewPanel';
 
 type Tab = HospitalStatus | 'ALL';
 const TABS: Tab[] = ['PENDING', 'APPROVED', 'REJECTED', 'ALL'];
-const TAB_LABELS: Record<Tab, string> = { PENDING: 'Pending', APPROVED: 'Approved', REJECTED: 'Rejected', ALL: 'All' };
-
-const EMPTY: Record<Tab, { title: string; description: string }> = {
-  PENDING: { title: 'No hospitals waiting', description: 'New hospital registrations appear here for you to review.' },
-  APPROVED: { title: 'No approved hospitals yet', description: 'Hospitals you approve appear here.' },
-  REJECTED: { title: 'No rejected hospitals', description: 'Hospitals you reject appear here, with your reason.' },
-  ALL: { title: 'No hospitals yet', description: 'Hospitals appear here as soon as they register.' },
-};
 
 const SEARCH_FILTERS = ['q', 'city'] as const;
 
@@ -42,6 +35,7 @@ function parseTab(value: string | null): Tab {
  * The tab and the open hospital live in the URL (?status=PENDING&hospital=12), so reloading or sharing keeps them.
  */
 export function HospitalsPage() {
+  const { t } = useTranslation();
   const { data: hospitals, isPending, isError, error, refetch, isRefetching } = useHospitals();
   const [params, setParams] = useSearchParams();
   const tab = parseTab(params.get('status'));
@@ -67,13 +61,17 @@ export function HospitalsPage() {
       matchesQuery(q, h.name, h.registrationNo, h.city) && (!city || h.city.trim().toLowerCase() === city.toLowerCase()),
   );
 
-  const inTab = (list: HospitalSummary[], t: Tab) => list.filter((h) => t === 'ALL' || h.status === t);
-  const counts = Object.fromEntries(TABS.map((t) => [t, hospitals ? inTab(searched, t).length : undefined])) as Record<
-    Tab,
-    number | undefined
-  >;
+  const inTab = (list: HospitalSummary[], tabName: Tab) => list.filter((h) => tabName === 'ALL' || h.status === tabName);
+  const counts = Object.fromEntries(
+    TABS.map((tabName) => [tabName, hospitals ? inTab(searched, tabName).length : undefined]),
+  ) as Record<Tab, number | undefined>;
 
-  const options: SegmentOption<Tab>[] = TABS.map((t) => ({ value: t, label: TAB_LABELS[t], count: counts[t] }));
+  const tabLabel = (tabName: Tab) => (tabName === 'ALL' ? t('common.all') : t(`status.hospital.${tabName}`));
+  const options: SegmentOption<Tab>[] = TABS.map((tabName) => ({
+    value: tabName,
+    label: tabLabel(tabName),
+    count: counts[tabName],
+  }));
 
   // The queue is oldest first, so nobody waits longest; other tabs show the newest first (as the API sends them)
   const rows = inTab(searched, tab);
@@ -83,7 +81,7 @@ export function HospitalsPage() {
   const columns: Column<HospitalSummary>[] = [
     {
       key: 'hospital',
-      header: 'Hospital',
+      header: t('common.hospital'),
       cell: (hospital) => (
         <div className="min-w-0">
           <p className="truncate font-medium">{hospital.name}</p>
@@ -91,25 +89,29 @@ export function HospitalsPage() {
         </div>
       ),
     },
-    { key: 'city', header: 'City', cell: (hospital) => hospital.city },
+    { key: 'city', header: t('common.city'), cell: (hospital) => hospital.city },
     {
       key: 'registered',
-      header: 'Registered',
+      header: t('common.registered'),
       cell: (hospital) => <span className="whitespace-nowrap">{formatInstant(hospital.createdAt)}</span>,
     },
-    { key: 'status', header: 'Status', cell: (hospital) => <HospitalStatusBadge status={hospital.status} /> },
+    { key: 'status', header: t('common.status'), cell: (hospital) => <HospitalStatusBadge status={hospital.status} /> },
     {
       key: 'action',
-      header: <span className="sr-only">Action</span>,
+      header: <span className="sr-only">{t('admin.hospitals.action')}</span>,
       align: 'right',
       cell: (hospital) => (
         <Button
           variant={hospital.status === 'PENDING' ? 'outline' : 'text'}
           size="sm"
-          aria-label={`${hospital.status === 'PENDING' ? 'Review' : 'View'} ${hospital.name}`}
+          aria-label={
+            hospital.status === 'PENDING'
+              ? t('admin.hospitals.reviewLabel', { name: hospital.name })
+              : t('admin.hospitals.viewLabel', { name: hospital.name })
+          }
           onClick={() => update({ hospital: String(hospital.id) })}
         >
-          {hospital.status === 'PENDING' ? 'Review' : 'View'}
+          {hospital.status === 'PENDING' ? t('admin.hospitals.review') : t('common.view')}
         </Button>
       ),
     },
@@ -118,25 +120,25 @@ export function HospitalsPage() {
   return (
     <div className="flex flex-col gap-6">
       <SegmentedControl
-        label="Filter hospitals by status"
+        label={t('admin.hospitals.filterLabel')}
         options={options}
         value={tab}
         onChange={(value) => update({ status: value })}
       />
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_440px]">
-        <Panel title={tab === 'PENDING' ? 'Waiting for review' : `${TAB_LABELS[tab]} hospitals`}>
+        <Panel title={t(`admin.hospitals.title.${tab}`)}>
           {hospitals && hospitals.length > 0 && (
             <FilterBar shown={rows.length} total={tabTotal} active={filters.active} onClear={filters.clear}>
               <SearchInput
-                label="Search hospitals"
-                placeholder="Name or registration no."
+                label={t('admin.hospitals.search')}
+                placeholder={t('admin.hospitals.searchPlaceholder')}
                 value={q}
                 onChange={(value) => filters.set('q', value)}
               />
               <FilterSelect
-                label="City"
-                allLabel="All cities"
+                label={t('common.city')}
+                allLabel={t('common.allCities')}
                 value={city}
                 onChange={(value) => filters.set('city', value)}
                 options={cities.map((c) => ({ value: c, label: c }))}
@@ -148,7 +150,7 @@ export function HospitalsPage() {
           ) : isError ? (
             <StateView
               state="error"
-              title="We couldn't load hospitals"
+              title={t('admin.hospitals.loadError')}
               error={error}
               action={
                 <Button
@@ -156,37 +158,42 @@ export function HospitalsPage() {
                   onClick={() => void refetch()}
                   leftIcon={<RefreshCw size={16} className="stroke-2" aria-hidden="true" />}
                 >
-                  Try again
+                  {t('common.tryAgain')}
                 </Button>
               }
             />
           ) : rows.length === 0 && filters.active ? (
             <StateView
               state="no-results"
-              title={`No ${TAB_LABELS[tab].toLowerCase()} hospitals match`}
+              title={t(`admin.hospitals.noMatch.${tab}`)}
               description={
                 tab !== 'ALL' && counts.ALL
-                  ? `${counts.ALL} ${counts.ALL === 1 ? 'hospital matches' : 'hospitals match'} in other tabs.`
-                  : 'Check the spelling, or search for part of the name or registration number.'
+                  ? t('admin.hospitals.otherTabs', { count: counts.ALL })
+                  : t('admin.hospitals.noMatchBody')
               }
               secondaryAction={
                 <Button variant="outline" onClick={filters.clear}>
-                  Clear filters
+                  {t('common.clearFilters')}
                 </Button>
               }
               action={
                 tab !== 'ALL' && counts.ALL ? (
                   <Button variant="dark" onClick={() => update({ status: 'ALL' })}>
-                    Show all statuses
+                    {t('admin.hospitals.showAll')}
                   </Button>
                 ) : undefined
               }
             />
           ) : rows.length === 0 ? (
-            <StateView state="empty" icon={Building2} {...EMPTY[tab]} />
+            <StateView
+              state="empty"
+              icon={Building2}
+              title={t(`admin.hospitals.empty.${tab}`)}
+              description={t(`admin.hospitals.emptyBody.${tab}`)}
+            />
           ) : (
             <Table
-              caption={`${TAB_LABELS[tab]} hospitals`}
+              caption={t(`admin.hospitals.title.${tab}`)}
               rows={rows}
               rowKey={(hospital) => hospital.id}
               columns={columns}

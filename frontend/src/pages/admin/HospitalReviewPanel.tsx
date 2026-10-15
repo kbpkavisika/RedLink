@@ -1,9 +1,11 @@
 import { Building2, Check, RefreshCw, X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import toast from 'react-hot-toast';
+import { Trans, useTranslation } from 'react-i18next';
 import { Badge, Button, FormAlert, HospitalStatusBadge, Panel, StateView, Textarea } from '../../components/ui';
 import { useDecideHospital, useHospital } from '../../hooks/useAdminHospitals';
 import { formatInstant } from '../../lib/format';
+import { msg } from '../../lib/messages';
 import type { HospitalDetail } from '../../types';
 
 const MAX_REASON = 500;
@@ -18,6 +20,7 @@ interface HospitalReviewPanelProps {
  * and, while it's PENDING, approve (A3) or reject it with a reason (A4).
  */
 export function HospitalReviewPanel({ hospitalId, onClose }: HospitalReviewPanelProps) {
+  const { t } = useTranslation();
   const { data: hospital, isPending, isError, error, refetch, isRefetching } = useHospital(hospitalId);
 
   if (hospitalId === null) {
@@ -26,8 +29,8 @@ export function HospitalReviewPanel({ hospitalId, onClose }: HospitalReviewPanel
         <StateView
           state="empty"
           icon={Building2}
-          title="Select a hospital"
-          description="Choose a hospital from the list to check its details and approve or reject it."
+          title={t('admin.review.selectTitle')}
+          description={t('admin.review.selectBody')}
         />
       </Panel>
     );
@@ -35,11 +38,11 @@ export function HospitalReviewPanel({ hospitalId, onClose }: HospitalReviewPanel
 
   return (
     <Panel
-      title={hospital?.name ?? 'Hospital'}
+      title={hospital?.name ?? t('common.hospital')}
       actions={
         <>
           {hospital && <HospitalStatusBadge status={hospital.status} />}
-          <Button variant="icon" size="sm" aria-label="Close details" onClick={onClose}>
+          <Button variant="icon" size="sm" aria-label={t('common.closeDetails')} onClick={onClose}>
             <X size={18} aria-hidden="true" />
           </Button>
         </>
@@ -50,7 +53,7 @@ export function HospitalReviewPanel({ hospitalId, onClose }: HospitalReviewPanel
       ) : isError ? (
         <StateView
           state="error"
-          title={error.status === 404 ? 'This hospital no longer exists' : "We couldn't load this hospital"}
+          title={error.status === 404 ? t('admin.review.gone') : t('admin.review.loadError')}
           error={error}
           action={
             error.status !== 404 && (
@@ -59,7 +62,7 @@ export function HospitalReviewPanel({ hospitalId, onClose }: HospitalReviewPanel
                 onClick={() => void refetch()}
                 leftIcon={<RefreshCw size={16} className="stroke-2" aria-hidden="true" />}
               >
-                Try again
+                {t('common.tryAgain')}
               </Button>
             )
           }
@@ -81,17 +84,18 @@ export function HospitalReviewPanel({ hospitalId, onClose }: HospitalReviewPanel
 }
 
 function HospitalFacts({ hospital }: { hospital: HospitalDetail }) {
+  const { t } = useTranslation();
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-body">
-      <Fact term="Registration no.">
+      <Fact term={t('admin.review.registrationNo')}>
         <span className="font-mono">{hospital.registrationNo}</span>
       </Fact>
-      <Fact term="Address">{hospital.address}</Fact>
-      <Fact term="City">{hospital.city}</Fact>
-      <Fact term="Phone">
+      <Fact term={t('admin.review.address')}>{hospital.address}</Fact>
+      <Fact term={t('common.city')}>{hospital.city}</Fact>
+      <Fact term={t('common.phone')}>
         <a href={`tel:${hospital.phone}`}>{hospital.phone}</a>
       </Fact>
-      <Fact term="Registered">{formatInstant(hospital.createdAt, true)}</Fact>
+      <Fact term={t('common.registered')}>{formatInstant(hospital.createdAt, true)}</Fact>
     </dl>
   );
 }
@@ -106,19 +110,20 @@ function Fact({ term, children }: { term: string; children: ReactNode }) {
 }
 
 function StaffList({ hospital }: { hospital: HospitalDetail }) {
+  const { t } = useTranslation();
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="text-eyebrow text-primary uppercase">Staff</h3>
+      <h3 className="text-eyebrow text-primary uppercase">{t('admin.review.staff')}</h3>
       {hospital.staff.length === 0 ? (
-        <p className="text-body text-text-muted">No staff accounts.</p>
+        <p className="text-body text-text-muted">{t('admin.review.noStaff')}</p>
       ) : (
         <ul className="flex flex-col divide-y divide-neutral-soft rounded-xl border border-border">
           {hospital.staff.map((member, index) => (
             <li key={member.id} className="flex flex-col gap-0.5 px-4 py-3">
               <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
                 {member.fullName}
-                {index === 0 && <Badge tone="info">Registered it</Badge>}
-                {!member.enabled && <Badge>Disabled</Badge>}
+                {index === 0 && <Badge tone="info">{t('admin.review.registeredIt')}</Badge>}
+                {!member.enabled && <Badge>{t('admin.review.disabled')}</Badge>}
               </p>
               <p className="flex flex-wrap gap-x-3 text-label text-text-muted">
                 <a href={`mailto:${member.email}`}>{member.email}</a>
@@ -134,19 +139,26 @@ function StaffList({ hospital }: { hospital: HospitalDetail }) {
 
 // Who decided, when and why: shown once a hospital is APPROVED or REJECTED (decisions are final)
 function DecisionRecord({ hospital }: { hospital: HospitalDetail }) {
+  const { t } = useTranslation();
   const when = hospital.reviewedAt ? formatInstant(hospital.reviewedAt, true) : null;
-  const who = hospital.reviewedBy ?? 'an admin';
-  const verb = hospital.status === 'APPROVED' ? 'Approved' : 'Rejected';
+  const who = hospital.reviewedBy ?? t('admin.review.anAdmin');
+  const approved = hospital.status === 'APPROVED';
+  const key = approved
+    ? when
+      ? 'admin.review.approvedByOn'
+      : 'admin.review.approvedBy'
+    : when
+      ? 'admin.review.rejectedByOn'
+      : 'admin.review.rejectedBy';
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border-strong px-4 py-3 text-label text-text-muted">
       <p>
-        {verb} by <strong className="text-ink">{who}</strong>
-        {when && <> on {when}</>}.
+        <Trans i18nKey={key} values={{ who, when }} components={{ b: <strong className="text-ink" /> }} />
       </p>
       {hospital.rejectionReason && (
         <p>
-          <span className="font-semibold text-ink">Reason shown to the staff:</span> {hospital.rejectionReason}
+          <span className="font-semibold text-ink">{t('admin.review.reasonShown')}</span> {hospital.rejectionReason}
         </p>
       )}
     </div>
@@ -156,6 +168,7 @@ function DecisionRecord({ hospital }: { hospital: HospitalDetail }) {
 type Mode = 'choose' | 'approve' | 'reject';
 
 function DecisionForm({ hospital }: { hospital: HospitalDetail }) {
+  const { t } = useTranslation();
   const decide = useDecideHospital(hospital.id);
   const [mode, setMode] = useState<Mode>('choose');
   const [reason, setReason] = useState('');
@@ -170,20 +183,20 @@ function DecisionForm({ hospital }: { hospital: HospitalDetail }) {
   const approve = () => {
     decide.mutate(
       { status: 'APPROVED' },
-      { onSuccess: () => toast.success(`${hospital.name} approved. Its staff can post requests now.`) },
+      { onSuccess: () => toast.success(t('admin.review.approvedToast', { name: hospital.name })) },
     );
   };
 
   const reject = () => {
     const trimmed = reason.trim();
     if (!trimmed) {
-      setReasonError('Give a reason. The hospital’s staff will see it.');
+      setReasonError(msg('reasonRequired'));
       return;
     }
     setReasonError(undefined);
     decide.mutate(
       { status: 'REJECTED', reason: trimmed },
-      { onSuccess: () => toast.success(`${hospital.name} rejected.`) },
+      { onSuccess: () => toast.success(t('admin.review.rejectedToast', { name: hospital.name })) },
     );
   };
 
@@ -191,21 +204,18 @@ function DecisionForm({ hospital }: { hospital: HospitalDetail }) {
 
   return (
     <section className="flex flex-col gap-4 rounded-xl bg-bg p-4">
-      <h3 className="text-eyebrow text-primary uppercase">Decision</h3>
+      <h3 className="text-eyebrow text-primary uppercase">{t('admin.review.decision')}</h3>
       <FormAlert>{decide.error && !serverReasonError ? decide.error.message : null}</FormAlert>
 
       {mode === 'choose' && (
         <>
-          <p className="text-body text-text-muted">
-            Check the registration number and call the staff member if anything looks wrong. A decision can’t be
-            changed later.
-          </p>
+          <p className="text-body text-text-muted">{t('admin.review.checkIntro')}</p>
           <div className="flex flex-wrap gap-2">
             <Button leftIcon={<Check size={16} aria-hidden="true" />} onClick={() => setMode('approve')}>
-              Approve
+              {t('admin.review.approve')}
             </Button>
             <Button variant="outline" onClick={() => setMode('reject')}>
-              Reject
+              {t('admin.review.reject')}
             </Button>
           </div>
         </>
@@ -214,14 +224,14 @@ function DecisionForm({ hospital }: { hospital: HospitalDetail }) {
       {mode === 'approve' && (
         <>
           <p className="text-body text-ink">
-            Approve <strong>{hospital.name}</strong>? Its staff can post blood requests straight away.
+            <Trans i18nKey="admin.review.approveConfirm" values={{ name: hospital.name }} components={{ b: <strong /> }} />
           </p>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={cancel} disabled={decide.isPending}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button loading={decide.isPending} onClick={approve}>
-              Confirm approval
+              {t('admin.review.confirmApproval')}
             </Button>
           </div>
         </>
@@ -230,20 +240,20 @@ function DecisionForm({ hospital }: { hospital: HospitalDetail }) {
       {mode === 'reject' && (
         <>
           <Textarea
-            label="Reason for rejecting"
+            label={t('admin.review.reasonLabel')}
             autoFocus
             maxLength={MAX_REASON}
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            hint={`Shown to the hospital’s staff. Say what was wrong and what they can do. ${reason.length}/${MAX_REASON}`}
-            error={reasonError ?? (serverReasonError && `Reason ${serverReasonError}`)}
+            hint={t('admin.review.reasonHint', { length: reason.length, max: MAX_REASON })}
+            error={reasonError ?? (serverReasonError && t('admin.review.serverReason', { message: serverReasonError }))}
           />
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={cancel} disabled={decide.isPending}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button loading={decide.isPending} onClick={reject}>
-              Reject hospital
+              {t('admin.review.rejectHospital')}
             </Button>
           </div>
         </>

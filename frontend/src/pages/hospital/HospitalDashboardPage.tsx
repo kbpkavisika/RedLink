@@ -1,5 +1,6 @@
 import { CheckCircle2, ClipboardList, HeartHandshake, Plus, RefreshCw, Siren } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
 import {
@@ -25,6 +26,7 @@ const SOON_MS = 6 * 60 * 60 * 1000;
  * Shares its data with the Requests table; refreshes every minute.
  */
 export function HospitalDashboardPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { data, isPending, isError, error, refetch, isRefetching } = useHospitalRequests();
   // Read once per visit, for the "due within 6 hours" flag
@@ -42,7 +44,7 @@ export function HospitalDashboardPage() {
       <Panel>
         <StateView
           state="error"
-          title="We couldn't load your dashboard"
+          title={t('hospital.dashboard.loadError')}
           error={error}
           action={
             <Button
@@ -50,7 +52,7 @@ export function HospitalDashboardPage() {
               onClick={() => void refetch()}
               leftIcon={<RefreshCw size={16} className="stroke-2" aria-hidden="true" />}
             >
-              Try again
+              {t('common.tryAgain')}
             </Button>
           }
         />
@@ -73,27 +75,32 @@ export function HospitalDashboardPage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-eyebrow text-primary uppercase">{user?.hospitalName}</p>
-          <h2 className="font-display text-display-sm text-ink">Today at a glance</h2>
+          <h2 className="font-display text-display-sm text-ink">{t('hospital.dashboard.title')}</h2>
         </div>
         <LinkButton to="/hospital/requests/new" leftIcon={<Plus size={16} aria-hidden="true" />}>
-          New request
+          {t('hospital.dashboard.newRequest')}
         </LinkButton>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Open requests" value={data.open} icon={ClipboardList} />
-        <StatTile label="Critical and open" value={data.criticalOpen} icon={Siren} tone="alert" />
-        <StatTile label="Donors coming" value={data.donorsComing} icon={HeartHandshake} tone="success" />
-        <StatTile label="Fulfilled" value={data.fulfilledLast30Days} icon={CheckCircle2} hint="Last 30 days" />
+        <StatTile label={t('hospital.dashboard.openRequests')} value={data.open} icon={ClipboardList} />
+        <StatTile label={t('hospital.dashboard.criticalOpen')} value={data.criticalOpen} icon={Siren} tone="alert" />
+        <StatTile label={t('hospital.dashboard.donorsComing')} value={data.donorsComing} icon={HeartHandshake} tone="success" />
+        <StatTile
+          label={t('hospital.dashboard.fulfilled')}
+          value={data.fulfilledLast30Days}
+          icon={CheckCircle2}
+          hint={t('hospital.dashboard.last30Days')}
+        />
       </div>
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Panel
-          title="Open requests"
+          title={t('hospital.dashboard.openRequests')}
           actions={
             data.requests.length > 0 && (
               <LinkButton to="/hospital/requests" variant="text" size="sm">
-                All requests
+                {t('hospital.dashboard.allRequests')}
               </LinkButton>
             )
           }
@@ -102,9 +109,9 @@ export function HospitalDashboardPage() {
             <StateView
               state="empty"
               icon={ClipboardList}
-              title="No open requests"
-              description="When you need blood, post a request and RedLink notifies the best-matched donors."
-              action={<LinkButton to="/hospital/requests/new">New request</LinkButton>}
+              title={t('hospital.dashboard.noOpen')}
+              description={t('hospital.dashboard.noOpenBody')}
+              action={<LinkButton to="/hospital/requests/new">{t('hospital.dashboard.newRequest')}</LinkButton>}
             />
           ) : (
             <ul className="divide-y divide-neutral-soft">
@@ -115,9 +122,9 @@ export function HospitalDashboardPage() {
           )}
         </Panel>
 
-        <Panel title="Recently closed">
+        <Panel title={t('hospital.dashboard.recentlyClosed')}>
           {recentlyClosed.length === 0 ? (
-            <p className="px-5 py-8 text-center text-label text-text-subtle">Fulfilled and cancelled requests appear here.</p>
+            <p className="px-5 py-8 text-center text-label text-text-subtle">{t('hospital.dashboard.recentlyClosedEmpty')}</p>
           ) : (
             <ul className="divide-y divide-neutral-soft">
               {recentlyClosed.map((request) => (
@@ -130,8 +137,10 @@ export function HospitalDashboardPage() {
                     <span className="min-w-0 flex-1">
                       <span className="block font-medium">#{request.reference}</span>
                       <span className="block text-caption text-text-subtle">
-                        {request.status === 'FULFILLED' ? `${request.donated} donated` : request.status.toLowerCase()} ·{' '}
-                        {request.closedAt && timeAgo(request.closedAt)}
+                        {request.status === 'FULFILLED'
+                          ? t('hospital.summary.donated', { count: request.donated })
+                          : t(`status.request.${request.status}`)}{' '}
+                        · {request.closedAt && timeAgo(request.closedAt)}
                       </span>
                     </span>
                   </Link>
@@ -146,6 +155,7 @@ export function HospitalDashboardPage() {
 }
 
 function OpenRequestRow({ request, now }: { request: RequestListItem; now: number }) {
+  const { t } = useTranslation();
   const dueSoon = new Date(request.neededBy).getTime() - now < SOON_MS;
   return (
     <li>
@@ -156,18 +166,18 @@ function OpenRequestRow({ request, now }: { request: RequestListItem; now: numbe
         <BloodGroupBadge group={request.bloodGroup} size="md" />
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-2 font-medium">
-            #{request.reference} · {request.unitsNeeded} {request.unitsNeeded === 1 ? 'unit' : 'units'}
+            #{request.reference} · {t('common.unit', { count: request.unitsNeeded })}
             <UrgencyTag urgency={request.urgency} />
           </p>
           <p className="text-caption text-text-subtle">
-            Needed by {formatInstant(request.neededBy, true)}
-            {dueSoon && <strong className="ml-1 text-warning">· due within 6 hours</strong>}
+            {t('hospital.dashboard.neededBy', { date: formatInstant(request.neededBy, true) })}
+            {dueSoon && <strong className="ml-1 text-warning">{t('hospital.dashboard.dueSoon')}</strong>}
           </p>
         </div>
         <div className="text-right text-label">
           <RepliesSummary request={request} />
           <p className="text-caption text-text-subtle">
-            {request.coming} of {request.unitsNeeded} covered
+            {t('hospital.dashboard.covered', { coming: request.coming, units: request.unitsNeeded })}
           </p>
         </div>
       </Link>

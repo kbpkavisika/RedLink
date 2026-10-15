@@ -7,16 +7,8 @@ const homePaths: Record<Role, string> = {
   DONOR: '/donor',
 };
 
-const labels: Record<Role, string> = {
-  ADMIN: 'Admin',
-  HOSPITAL_STAFF: 'Hospital staff',
-  DONOR: 'Donor',
-};
-
 export function homePathFor(role: Role): string {
   return homePaths[role];
 }
 
-export function roleLabel(role: Role): string {
-  return labels[role];
-}
+// A role's name is translated: t(`status.role.${role}`)

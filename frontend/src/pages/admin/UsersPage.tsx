@@ -1,5 +1,6 @@
 import { RefreshCw, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../auth/useAuth';
 import {
   Badge,
@@ -18,28 +19,23 @@ import {
 import { useUserSearch } from '../../hooks/useAdminUsers';
 import { useUrlFilters } from '../../hooks/useUrlFilters';
 import { formatInstant } from '../../lib/format';
-import { roleLabel } from '../../lib/roles';
 import type { Role, UserSummary } from '../../types';
 import { AddStaffPanel } from './AddStaffPanel';
 
 type RoleTab = Role | 'ALL';
-const ROLE_OPTIONS: SegmentOption<RoleTab>[] = [
-  { value: 'ALL', label: 'All' },
-  { value: 'ADMIN', label: 'Admins' },
-  { value: 'HOSPITAL_STAFF', label: 'Hospital staff' },
-  { value: 'DONOR', label: 'Donors' },
-];
+const ROLE_TABS: RoleTab[] = ['ALL', 'ADMIN', 'HOSPITAL_STAFF', 'DONOR'];
 
 // The API returns at most this many (backend: UserAdminService.MAX_RESULTS)
 const MAX_RESULTS = 200;
 
 const FILTERS = ['q', 'role', 'status'] as const;
 
+// The words are translated: t(`admin.users.userStatus.${status}`)
 type UserStatus = 'active' | 'temporary' | 'disabled';
-const STATUS: Record<UserStatus, { label: string; tone: BadgeTone }> = {
-  active: { label: 'Active', tone: 'success' },
-  temporary: { label: 'Temporary password', tone: 'warning' },
-  disabled: { label: 'Disabled', tone: 'neutral' },
+const STATUS_TONES: Record<UserStatus, BadgeTone> = {
+  active: 'success',
+  temporary: 'warning',
+  disabled: 'neutral',
 };
 
 function statusOf(user: UserSummary): UserStatus {
@@ -47,7 +43,7 @@ function statusOf(user: UserSummary): UserStatus {
 }
 
 function parseRole(value: string | null): RoleTab {
-  return ROLE_OPTIONS.find((option) => option.value === value)?.value ?? 'ALL';
+  return ROLE_TABS.find((tab) => tab === value) ?? 'ALL';
 }
 
 /**
@@ -56,6 +52,7 @@ function parseRole(value: string | null): RoleTab {
  * The role filter and search text live in the URL (?role=DONOR&q=kamal).
  */
 export function UsersPage() {
+  const { t } = useTranslation();
   const { user: me } = useAuth();
   const filters = useUrlFilters(FILTERS);
   const role = parseRole(filters.values.role);
@@ -69,15 +66,20 @@ export function UsersPage() {
   });
   const rows = (users ?? []).filter((user) => !status || statusOf(user) === status);
 
+  const roleOptions: SegmentOption<RoleTab>[] = ROLE_TABS.map((tab) => ({
+    value: tab,
+    label: tab === 'ALL' ? t('common.all') : t(`admin.users.roleTab.${tab}`),
+  }));
+
   const columns: Column<UserSummary>[] = [
     {
       key: 'user',
-      header: 'User',
+      header: t('admin.users.user'),
       cell: (user) => (
         <div className="min-w-0">
           <p className="truncate font-medium">
             {user.fullName}
-            {user.id === me?.id && <span className="text-text-subtle"> (you)</span>}
+            {user.id === me?.id && <span className="text-text-subtle">{t('admin.users.you')}</span>}
           </p>
           <p className="truncate text-caption text-text-subtle">{user.email}</p>
         </div>
@@ -85,25 +87,25 @@ export function UsersPage() {
     },
     {
       key: 'role',
-      header: 'Role',
+      header: t('admin.users.role'),
       cell: (user) => (
         <div className="min-w-0">
-          <p className="whitespace-nowrap">{roleLabel(user.role)}</p>
+          <p className="whitespace-nowrap">{t(`status.role.${user.role}`)}</p>
           {user.hospitalName && <p className="truncate text-caption text-text-subtle">{user.hospitalName}</p>}
         </div>
       ),
     },
     {
       key: 'status',
-      header: 'Status',
+      header: t('common.status'),
       cell: (user) => {
-        const { label, tone } = STATUS[statusOf(user)];
-        return <Badge tone={tone}>{label}</Badge>;
+        const userStatus = statusOf(user);
+        return <Badge tone={STATUS_TONES[userStatus]}>{t(`admin.users.userStatus.${userStatus}`)}</Badge>;
       },
     },
     {
       key: 'joined',
-      header: 'Joined',
+      header: t('admin.users.joined'),
       cell: (user) => <span className="whitespace-nowrap">{formatInstant(user.createdAt)}</span>,
     },
   ];
@@ -112,40 +114,47 @@ export function UsersPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <SegmentedControl
-          label="Filter users by role"
-          options={ROLE_OPTIONS}
+          label={t('admin.users.filterLabel')}
+          options={roleOptions}
           value={role}
           onChange={(value) => filters.set('role', value === 'ALL' ? null : value)}
         />
         <Button leftIcon={<UserPlus size={16} aria-hidden="true" />} onClick={() => setAdding(true)}>
-          Add staff user
+          {t('admin.users.addStaff')}
         </Button>
       </div>
 
       <div className={adding ? 'grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_440px]' : undefined}>
         <Panel
-          title="Users"
+          title={t('admin.users.title')}
           actions={
             users && (
               <span className="text-label text-text-subtle" aria-live="polite">
-                {isFetching ? 'Searching…' : users.length >= MAX_RESULTS ? `Newest ${MAX_RESULTS}` : `${rows.length} found`}
+                {isFetching
+                  ? t('common.searching')
+                  : users.length >= MAX_RESULTS
+                    ? t('admin.users.newest', { count: MAX_RESULTS })
+                    : t('admin.users.found', { count: rows.length })}
               </span>
             )
           }
         >
           <FilterBar active={filters.active} onClear={filters.clear}>
             <SearchInput
-              label="Search users"
-              placeholder="Name or email"
+              label={t('admin.users.search')}
+              placeholder={t('admin.users.searchPlaceholder')}
               value={q}
               onChange={(value) => filters.set('q', value)}
             />
             <FilterSelect
-              label="Status"
-              allLabel="Any status"
+              label={t('common.status')}
+              allLabel={t('common.anyStatus')}
               value={status}
               onChange={(value) => filters.set('status', value)}
-              options={(Object.keys(STATUS) as UserStatus[]).map((key) => ({ value: key, label: STATUS[key].label }))}
+              options={(Object.keys(STATUS_TONES) as UserStatus[]).map((key) => ({
+                value: key,
+                label: t(`admin.users.userStatus.${key}`),
+              }))}
             />
           </FilterBar>
           {isPending ? (
@@ -153,7 +162,7 @@ export function UsersPage() {
           ) : isError ? (
             <StateView
               state="error"
-              title="We couldn't load users"
+              title={t('admin.users.loadError')}
               error={error}
               action={
                 <Button
@@ -161,7 +170,7 @@ export function UsersPage() {
                   onClick={() => void refetch()}
                   leftIcon={<RefreshCw size={16} className="stroke-2" aria-hidden="true" />}
                 >
-                  Try again
+                  {t('common.tryAgain')}
                 </Button>
               }
             />
@@ -169,28 +178,23 @@ export function UsersPage() {
             filters.active ? (
               <StateView
                 state="no-results"
-                title="No users match"
-                description="Check the spelling, or search for part of the name or email."
+                title={t('admin.users.noMatch')}
+                description={t('admin.users.noMatchBody')}
                 secondaryAction={
                   <Button variant="outline" onClick={filters.clear}>
-                    Clear filters
+                    {t('common.clearFilters')}
                   </Button>
                 }
               />
             ) : (
-              <StateView state="empty" icon={Users} title="No users yet" />
+              <StateView state="empty" icon={Users} title={t('admin.users.empty')} />
             )
           ) : (
             <>
-              <Table
-                caption="Users"
-                rows={rows}
-                rowKey={(user) => user.id}
-                columns={columns}
-              />
+              <Table caption={t('admin.users.title')} rows={rows} rowKey={(user) => user.id} columns={columns} />
               {users.length >= MAX_RESULTS && (
                 <p className="border-t border-border px-5 py-3 text-caption text-text-subtle">
-                  Showing the newest {MAX_RESULTS}. Search by name or email to find someone older.
+                  {t('admin.users.showingNewest', { count: MAX_RESULTS })}
                 </p>
               )}
             </>

@@ -1,4 +1,5 @@
 import { ClipboardList, RefreshCw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import {
   BloodGroupBadge,
@@ -18,17 +19,12 @@ import { useUrlFilters } from '../../hooks/useUrlFilters';
 import { formatBloodGroup, formatInstant } from '../../lib/format';
 import { REQUEST_STATUS } from '../../lib/requestStatus';
 import { matchesQuery } from '../../lib/search';
-import { BLOOD_GROUPS, type RequestListItem, type RequestStatus } from '../../types';
+import { BLOOD_GROUPS, type RequestListItem, type RequestStatus, type Urgency } from '../../types';
 import { RepliesSummary } from '../hospital/RepliesSummary';
 import { AdminRequestPanel } from './AdminRequestPanel';
 
 const FILTERS = ['q', 'hospital', 'city', 'status', 'urgency', 'group'] as const;
-const URGENCIES = [
-  { value: 'CRITICAL', label: 'Critical' },
-  { value: 'HIGH', label: 'High' },
-  { value: 'MEDIUM', label: 'Medium' },
-  { value: 'LOW', label: 'Low' },
-];
+const URGENCIES: Urgency[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()))].sort((a, b) => a.localeCompare(b));
@@ -39,6 +35,7 @@ function uniqueSorted(values: string[]): string[] {
  * opens a read-only panel with its replies and outcome. Filters and the open request live in the URL.
  */
 export function AdminRequestsPage() {
+  const { t } = useTranslation();
   const { data, isPending, isError, error, refetch, isRefetching } = useAllRequests();
   const filters = useUrlFilters(FILTERS);
   const { q, hospital, city, status, urgency, group } = filters.values;
@@ -72,13 +69,13 @@ export function AdminRequestsPage() {
   const columns: Column<RequestListItem>[] = [
     {
       key: 'request',
-      header: 'Request',
+      header: t('common.request'),
       cell: (r) => (
         <div className="flex items-center gap-3">
           <BloodGroupBadge group={r.bloodGroup} />
           <div className="min-w-0">
             <p className="font-medium whitespace-nowrap">
-              #{r.reference} · {r.unitsNeeded} {r.unitsNeeded === 1 ? 'unit' : 'units'}
+              #{r.reference} · {t('common.unit', { count: r.unitsNeeded })}
             </p>
             <p className="truncate text-caption text-text-subtle">
               {r.hospitalName} · {r.city}
@@ -87,21 +84,26 @@ export function AdminRequestsPage() {
         </div>
       ),
     },
-    { key: 'urgency', header: 'Urgency', cell: (r) => <UrgencyTag urgency={r.urgency} /> },
+    { key: 'urgency', header: t('common.urgency'), cell: (r) => <UrgencyTag urgency={r.urgency} /> },
     {
       key: 'posted',
-      header: 'Posted',
+      header: t('common.posted'),
       cell: (r) => <span className="whitespace-nowrap">{formatInstant(r.createdAt)}</span>,
     },
-    { key: 'replies', header: 'Replies', cell: (r) => <RepliesSummary request={r} /> },
-    { key: 'status', header: 'Status', cell: (r) => <RequestStatusBadge status={r.status} /> },
+    { key: 'replies', header: t('common.replies'), cell: (r) => <RepliesSummary request={r} /> },
+    { key: 'status', header: t('common.status'), cell: (r) => <RequestStatusBadge status={r.status} /> },
     {
       key: 'view',
-      header: <span className="sr-only">View</span>,
+      header: <span className="sr-only">{t('common.view')}</span>,
       align: 'right',
       cell: (r) => (
-        <Button variant="text" size="sm" aria-label={`View #${r.reference}`} onClick={() => select(r.id)}>
-          View
+        <Button
+          variant="text"
+          size="sm"
+          aria-label={t('admin.requests.viewLabel', { ref: r.reference })}
+          onClick={() => select(r.id)}
+        >
+          {t('common.view')}
         </Button>
       ),
     },
@@ -109,49 +111,49 @@ export function AdminRequestsPage() {
 
   return (
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_440px]">
-      <Panel title="All requests">
+      <Panel title={t('admin.requests.title')}>
         {requests.length > 0 && (
           <FilterBar shown={rows.length} total={requests.length} active={filters.active} onClear={filters.clear}>
             <SearchInput
-              label="Search requests"
-              placeholder="RQ number, hospital or city"
+              label={t('hospital.list.search')}
+              placeholder={t('admin.requests.searchPlaceholder')}
               value={q}
               onChange={(value) => filters.set('q', value)}
             />
             <FilterSelect
-              label="Hospital"
-              allLabel="All hospitals"
+              label={t('common.hospital')}
+              allLabel={t('admin.requests.allHospitals')}
               value={hospital}
               onChange={(value) => filters.set('hospital', value)}
               options={hospitals.map((h) => ({ value: h, label: h }))}
             />
             <FilterSelect
-              label="City"
-              allLabel="All cities"
+              label={t('common.city')}
+              allLabel={t('common.allCities')}
               value={city}
               onChange={(value) => filters.set('city', value)}
               options={cities.map((c) => ({ value: c, label: c }))}
             />
             <FilterSelect
-              label="Status"
-              allLabel="Any status"
+              label={t('common.status')}
+              allLabel={t('common.anyStatus')}
               value={status}
               onChange={(value) => filters.set('status', value)}
               options={(Object.keys(REQUEST_STATUS) as RequestStatus[]).map((s) => ({
                 value: s,
-                label: REQUEST_STATUS[s].label,
+                label: t(`status.request.${s}`),
               }))}
             />
             <FilterSelect
-              label="Urgency"
-              allLabel="Any urgency"
+              label={t('common.urgency')}
+              allLabel={t('common.anyUrgency')}
               value={urgency}
               onChange={(value) => filters.set('urgency', value)}
-              options={URGENCIES}
+              options={URGENCIES.map((u) => ({ value: u, label: t(`status.urgency.${u}`) }))}
             />
             <FilterSelect
-              label="Blood group"
-              allLabel="All groups"
+              label={t('common.bloodGroup')}
+              allLabel={t('common.allGroups')}
               value={group}
               onChange={(value) => filters.set('group', value)}
               options={BLOOD_GROUPS.map((g) => ({ value: g, label: formatBloodGroup(g) }))}
@@ -164,7 +166,7 @@ export function AdminRequestsPage() {
         ) : isError ? (
           <StateView
             state="error"
-            title="We couldn't load requests"
+            title={t('admin.requests.loadError')}
             error={error}
             action={
               <Button
@@ -172,7 +174,7 @@ export function AdminRequestsPage() {
                 onClick={() => void refetch()}
                 leftIcon={<RefreshCw size={16} className="stroke-2" aria-hidden="true" />}
               >
-                Try again
+                {t('common.tryAgain')}
               </Button>
             }
           />
@@ -180,24 +182,24 @@ export function AdminRequestsPage() {
           <StateView
             state="empty"
             icon={ClipboardList}
-            title="No requests yet"
-            description="Requests appear here as soon as approved hospitals post them."
+            title={t('hospital.list.emptyTitle')}
+            description={t('admin.requests.emptyBody')}
           />
         ) : rows.length === 0 ? (
           <StateView
             state="no-results"
-            title="No requests match"
-            description="Try another search, or clear the filters to see every request."
+            title={t('hospital.list.noMatch')}
+            description={t('hospital.list.noMatchBody')}
             action={
               <Button variant="outline" onClick={filters.clear}>
-                Clear filters
+                {t('common.clearFilters')}
               </Button>
             }
           />
         ) : (
           <>
             <Table
-              caption="Requests across every hospital, newest first"
+              caption={t('admin.requests.caption')}
               rows={rows}
               rowKey={(r) => r.id}
               columns={columns}
@@ -205,7 +207,7 @@ export function AdminRequestsPage() {
             />
             {requests.length >= 500 && (
               <p className="border-t border-border px-5 py-3 text-caption text-text-subtle">
-                Showing the newest 500 requests.
+                {t('admin.requests.newest500')}
               </p>
             )}
           </>

@@ -1,5 +1,6 @@
 import { ArrowRight, CalendarClock, MapPin, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
   BloodGroupBadge,
@@ -17,9 +18,9 @@ import type { DonorProfile, IncomingRequest } from '../../types';
 
 const PREVIEW = 3;
 
-function greeting(now = new Date()): string {
+function greetingKey(now = new Date()) {
   const hour = now.getHours();
-  return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  return hour < 12 ? 'greetingMorning' : hour < 17 ? 'greetingAfternoon' : 'greetingEvening';
 }
 
 /**
@@ -27,6 +28,7 @@ function greeting(now = new Date()): string {
  * on the right (design.md §7). Replying to requests happens on /donor/requests.
  */
 export function DonorHomePage() {
+  const { t } = useTranslation();
   const profile = useMyProfile();
 
   if (profile.isPending) {
@@ -41,7 +43,7 @@ export function DonorHomePage() {
       <Panel>
         <StateView
           state="error"
-          title="We couldn't load your donor profile"
+          title={t('donor.home.loadError')}
           error={profile.error}
           action={
             <Button
@@ -49,7 +51,7 @@ export function DonorHomePage() {
               onClick={() => void profile.refetch()}
               leftIcon={<RefreshCw size={16} className="stroke-2" aria-hidden="true" />}
             >
-              Try again
+              {t('common.tryAgain')}
             </Button>
           }
         />
@@ -62,7 +64,7 @@ export function DonorHomePage() {
     <div className="flex flex-col gap-6">
       <header className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-label text-text-muted">{greeting()}</p>
+          <p className="text-label text-text-muted">{t(`donor.home.${greetingKey()}`)}</p>
           <h2 className="font-display text-display-sm text-ink">{me.fullName}</h2>
         </div>
         <BloodGroupBadge group={me.bloodGroup} size="lg" />
@@ -81,10 +83,11 @@ export function DonorHomePage() {
 
 // D4: "You can donate" or when they can again, with the ring
 function EligibilityCard({ me }: { me: DonorProfile }) {
+  const { t } = useTranslation();
   const lastDonation =
     me.lastDonationDate === null
-      ? "You haven't donated through RedLink yet."
-      : `Last donation ${formatDate(me.lastDonationDate)} · ${me.daysSinceLastDonation} ${me.daysSinceLastDonation === 1 ? 'day' : 'days'} ago`;
+      ? t('donor.home.neverDonated')
+      : t('donor.home.lastDonation', { date: formatDate(me.lastDonationDate), count: me.daysSinceLastDonation ?? 0 });
 
   return (
     <Panel padded>
@@ -96,16 +99,20 @@ function EligibilityCard({ me }: { me: DonorProfile }) {
         />
         <div className="flex min-w-0 flex-col gap-0.5">
           <p className="text-title-md text-ink">
-            {me.eligible ? 'You can donate' : `You can donate again on ${formatDate(me.nextEligibleDate as string)}`}
+            {me.eligible
+              ? t('donor.home.canDonate')
+              : t('donor.home.canDonateAgainOn', { date: formatDate(me.nextEligibleDate as string) })}
           </p>
           <p className="text-label text-text-muted">{lastDonation}</p>
         </div>
       </div>
       {!me.eligible && (
         <p className="mt-4 rounded-xl border border-dashed border-border-strong px-4 py-3.5 text-label text-text-muted">
-          Donors wait <strong className="text-ink">{me.daysBetweenDonations} days</strong> between donations so the
-          body can recover. You'll still see requests, and can accept them from{' '}
-          <strong className="text-ink">{formatDate(me.nextEligibleDate as string)}</strong>.
+          <Trans
+            i18nKey="donor.home.waitNote"
+            values={{ days: me.daysBetweenDonations, date: formatDate(me.nextEligibleDate as string) }}
+            components={{ b: <strong className="text-ink" /> }}
+          />
         </p>
       )}
     </Panel>
@@ -114,24 +121,20 @@ function EligibilityCard({ me }: { me: DonorProfile }) {
 
 // D3: pausing alerts while travelling or unwell
 function AvailabilityCard({ me }: { me: DonorProfile }) {
+  const { t } = useTranslation();
   const setAvailability = useSetAvailability();
 
   const change = (available: boolean) =>
     setAvailability.mutate(available, {
-      onSuccess: () =>
-        toast.success(available ? "You're available again. We'll alert you to matching requests." : 'Alerts paused.'),
+      onSuccess: () => toast.success(available ? t('donor.home.availableAgain') : t('donor.home.paused')),
       onError: (error) => toast.error(error.message),
     });
 
   return (
     <Panel padded>
       <Switch
-        label="Available for requests"
-        description={
-          me.available
-            ? 'Turn off while travelling or unwell'
-            : "Paused: hospitals won't see you as a match until you turn this back on"
-        }
+        label={t('donor.home.available')}
+        description={me.available ? t('donor.home.availableHint') : t('donor.home.pausedHint')}
         checked={me.available}
         onChange={change}
         disabled={setAvailability.isPending}
@@ -142,19 +145,25 @@ function AvailabilityCard({ me }: { me: DonorProfile }) {
 
 // D5 preview: the most urgent requests the donor hasn't answered yet
 function NeedsYouNow() {
+  const { t } = useTranslation();
   const incoming = useIncomingRequests();
 
   if (incoming.isPending) {
     return (
-      <Panel title="Needs you now">
+      <Panel title={t('donor.home.needsYouNow')}>
         <StateView state="loading" rows={3} />
       </Panel>
     );
   }
   if (incoming.isError) {
     return (
-      <Panel title="Needs you now">
-        <StateView state="error" title="We couldn't load requests" error={incoming.error} onRetry={() => void incoming.refetch()} />
+      <Panel title={t('donor.home.needsYouNow')}>
+        <StateView
+          state="error"
+          title={t('donor.home.requestsLoadError')}
+          error={incoming.error}
+          onRetry={() => void incoming.refetch()}
+        />
       </Panel>
     );
   }
@@ -166,30 +175,30 @@ function NeedsYouNow() {
     <Panel
       title={
         <span>
-          Needs you now <span className="text-text-subtle">· {unanswered.length}</span>
+          {t('donor.home.needsYouNow')} <span className="text-text-subtle">· {unanswered.length}</span>
         </span>
       }
       actions={
         incoming.data.length > 0 && (
           <LinkButton to="/donor/requests" variant="text" size="sm">
-            All requests
+            {t('donor.home.allRequests')}
           </LinkButton>
         )
       }
     >
       {accepted.length > 0 && (
         <p className="border-b border-border bg-success-soft px-5 py-3 text-label text-success">
-          You've accepted {accepted.length} {accepted.length === 1 ? 'request' : 'requests'}.{' '}
+          {t('donor.home.accepted', { count: accepted.length })}{' '}
           <Link to="/donor/requests" className="font-semibold text-success">
-            See where to go
+            {t('donor.home.seeWhereToGo')}
           </Link>
         </p>
       )}
       {unanswered.length === 0 ? (
         <StateView
           state="empty"
-          title="Nothing needs you right now"
-          description="When a hospital needs your blood group, the request appears here and we'll notify you."
+          title={t('donor.home.nothingNeedsYou')}
+          description={t('donor.home.nothingNeedsYouBody')}
         />
       ) : (
         <ul className="divide-y divide-neutral-soft">
@@ -198,9 +207,9 @@ function NeedsYouNow() {
           ))}
           {unanswered.length > PREVIEW && (
             <li className="px-5 py-3 text-label text-text-muted">
-              And {unanswered.length - PREVIEW} more.{' '}
+              {t('donor.home.andMore', { count: unanswered.length - PREVIEW })}{' '}
               <Link to="/donor/requests" className="font-semibold">
-                See all
+                {t('common.seeAll')}
               </Link>
             </li>
           )}
@@ -211,6 +220,7 @@ function NeedsYouNow() {
 }
 
 function RequestPreview({ request }: { request: IncomingRequest }) {
+  const { t } = useTranslation();
   return (
     <li>
       <Link
@@ -230,10 +240,10 @@ function RequestPreview({ request }: { request: IncomingRequest }) {
             </span>
             <span className="inline-flex items-center gap-1">
               <CalendarClock size={13} aria-hidden="true" />
-              By {formatInstant(request.neededBy, true)}
+              {t('donor.home.by', { date: formatInstant(request.neededBy, true) })}
             </span>
             <span>
-              {request.unitsNeeded} {request.unitsNeeded === 1 ? 'unit' : 'units'} of {formatBloodGroup(request.bloodGroup)}
+              {t('common.unitsOf', { count: request.unitsNeeded, group: formatBloodGroup(request.bloodGroup) })}
             </span>
           </p>
         </div>
